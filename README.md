@@ -40,18 +40,18 @@ WMS 운영 환경에서는 **다양한 도메인 이벤트**에 대한 이메일
 
 기존 시스템은 **발송 지점 증가 시 유지보수 비용이 선형적으로 증가**하는 구조였습니다:
 
-1. **높은 결합도**: 각 발송 지점이 `MailSection` 객체를 직접 생성 → 내부 구조 변경 시 전체 수정 필요
+1. **강결합**: 각 발송 지점이 `MailSection` 객체를 직접 생성 → 내부 구조 변경 시 전체 수정 필요
 2. **고정된 섹션 조합 (팩토리 패턴 한계)**: 템플릿 기반 고정 조합 → 새로운 조합마다 팩토리 메서드 추가 (조합 폭발)
 3. **DB 템플릿 의존성**: 템플릿 변경 시 DB 업데이트 + 배포 필요 → 변경 비용 높음
 4. **코드 중복**: 각 발송 지점마다 20줄 이상의 섹션 빌드 코드 반복 → **발송처 10개 시 200줄 중복**
 
-### 솔루션: 낮은 결합도 + 정보 은닉
+### 솔루션: 약한 결합도 + 정보 은닉
 
-**빌더 + 헬퍼 메서드 패턴**으로 완전히 재설계하여 **발송 지점 증가에도 유지보수 비용 최소화**:
+**Builder + Helper 메서드 패턴**으로 완전히 재설계하여 **발송 지점 증가에도 유지보수 비용 최소화**:
 
 #### 핵심 설계 원칙
 
-1. **낮은 결합도**
+1. **약한 결합도**
    - 발송 지점 → `MailRequest` 의존 (추상화된 인터페이스)
    - 발송 지점 → `MailSection` 의존성 **완전 제거** (내부 구현 숨김)
    - 효과: 내부 구조 변경 시 발송 지점 코드 수정 불필요
@@ -62,20 +62,20 @@ WMS 운영 환경에서는 **다양한 도메인 이벤트**에 대한 이메일
    - 효과: SectionType 추가/변경 시 3개 파일만 수정 (발송 지점 영향 없음)
 
 3. **단일 책임 원칙**
-   - 헬퍼 메서드: 도메인 로직만 담당 (Subject 포맷, 아이콘 표준)
-   - 빌더 메서드: 섹션 조합만 담당 (유연한 구성)
-   - 효과: 비즈니스 규칙 변경 시 헬퍼 메서드만 수정
+   - Helper 메서드: 도메인 로직만 담당 (Subject 포맷, 아이콘 표준)
+   - Builder 메서드: 섹션 조합만 담당 (유연한 구성)
+   - 효과: 비즈니스 규칙 변경 시 Helper 메서드만 수정
 
 4. **확장성**
-   - 발송처 1개 → 10개 증가 시: 코드 중복 0줄 (헬퍼 메서드 재사용)
-   - 새로운 조합 필요 시: 팩토리 메서드 추가 불필요 (빌더로 자유 조합)
+   - 발송처 1개 → 10개 증가 시: 코드 중복 0줄 (Helper 메서드 재사용)
+   - 새로운 조합 필요 시: 팩토리 메서드 추가 불필요 (Builder로 자유 조합)
    - 효과: **발송처 증가에도 O(1) 유지보수 비용**
 
 ---
 
 ## 🔑 핵심 설계 포인트
 
-### 1. 낮은 결합도: 발송 지점 확장성 극대화
+### 1. 약한 결합도: 발송 지점 확장성 극대화
 
 #### 문제 정의
 
@@ -94,7 +94,7 @@ WMS 운영 환경에서는 **다양한 도메인 이벤트**에 대한 이메일
 
 **기존 팩토리 패턴의 한계**:
 ```java
-// 각 발송 지점이 MailSection을 직접 알아야 함 (높은 결합도)
+// 각 발송 지점이 MailSection을 직접 알아야 함 (강결합)
 List<MailSection> sections = MailSection.forAlarm(name, severity, tableData);
 // → 내부 구조 변경 시 모든 발송 지점 수정 필요
 // → 발송처 10개 시 변경 비용 10배 증가
@@ -105,11 +105,11 @@ List<MailSection> sections = MailSection.forAlarm(name, severity, tableData);
 **두 가지 메서드로 역할 분리 + 내부 구조 숨김**
 
 ```java
-// 1. 헬퍼 메서드: 도메인 로직 캡슐화
+// 1. Helper 메서드: 도메인 로직 캡슐화
 MailRequest.alarmSubject("재고 부족", "CRITICAL", 5);  // "[긴급] WMS 재고 부족 알림 5건"
 MailRequest.alarmTitle("재고 부족", "CRITICAL");       // "🔴 재고 부족 알림"
 
-// 2. 빌더 메서드: 유연한 섹션 조합
+// 2. Builder 메서드: 유연한 섹션 조합
 MailRequest.builder()
     .subject(MailRequest.alarmSubject(title, severity, count))
     .addTextSection(MailRequest.alarmTitle(title, severity), content)
@@ -122,7 +122,7 @@ MailRequest.builder()
 
 **효과 (확장성 관점)**:
 
-1. **낮은 결합도**: 발송 지점 → `MailSection` 의존성 완전 제거
+1. **약한 결합도**: 발송 지점 → `MailSection` 의존성 완전 제거
    - 발송 지점은 `MailRequest.builder()` API만 알면 됨
    - 내부 구조(`MailSection`, `SectionType`) 변경 시 발송 지점 영향 없음
 
@@ -131,12 +131,12 @@ MailRequest.builder()
    - **파사드 패턴** 적용: 복잡한 내부 로직을 단순한 인터페이스로 제공
 
 3. **단일 진실 공급원**: 도메인 로직을 한 곳에서 관리
-   - Subject 포맷, 아이콘 표준, 심각도 매핑 → 헬퍼 메서드로 집중화
+   - Subject 포맷, 아이콘 표준, 심각도 매핑 → Helper 메서드로 집중화
    - 비즈니스 규칙 변경 시 1개 파일만 수정 (발송 지점 영향 없음)
 
 4. **확장성**: 발송처 증가에도 O(1) 유지보수 비용
-   - 발송처 1개 → 10개 증가 시: 코드 중복 0줄 (헬퍼 메서드 재사용)
-   - 새로운 조합 필요 시: 빌더로 자유 조합 (팩토리 메서드 추가 불필요)
+   - 발송처 1개 → 10개 증가 시: 코드 중복 0줄 (Helper 메서드 재사용)
+   - 새로운 조합 필요 시: Builder로 자유 조합 (팩토리 메서드 추가 불필요)
 
 ### 2. Producer-Consumer 패턴
 
@@ -210,7 +210,7 @@ MailRequest.builder()
   - 새로운 SectionType 추가 시: 3개 파일만 수정 (발송 지점 영향 없음)
   - 새로운 발송처 추가 시: Helper Methods 재사용 (코드 중복 없음)
 - ✅ **DIP (Dependency Inversion)**: 추상화에 의존
-  - 발송 지점 → MailRequest (추상화된 빌더 인터페이스)
+  - 발송 지점 → MailRequest (추상화된 Builder 인터페이스)
   - 발송 지점 → MailSection 의존성 제거 (구체 클래스 숨김)
 - ✅ **LSP (Liskov Substitution)**: 하위 타입 치환 가능
   - SectionType별 렌더링 로직을 다형성으로 처리 (switch문은 한 곳에만 존재)
@@ -295,7 +295,7 @@ List<MailSection> sections = Arrays.asList(textSection, tableSection);
 
 **문제점**:
 - 🔴 각 발송 지점마다 20줄 이상 코드 반복
-- 🔴 서비스 계층이 MailSection에 직접 의존 (높은 결합도)
+- 🔴 서비스 계층이 MailSection에 직접 의존 (강결합)
 - 🔴 아이콘, Subject 형식을 개발자마다 다르게 작성 (일관성 부족)
 
 ---
@@ -783,12 +783,12 @@ SELECT * FROM MAIL_QUEUE WHERE STATUS = 'PENDING';
 
 **Backend Developer**
 - GitHub: [@na1011](https://github.com/na1011)
-- Email: na1011@example.com
+- Email: zerus94@naver.com
 
 ---
 
-## 🙏 감사의 말
+## 🙏 마치며
 
-이 프로젝트는 실제 레거시 환경(Java 8, Spring 3.2, Oracle 19c)에서의 제약사항을 고려하면서도, 최신 설계 패턴(Builder + Helper Methods)과 OOP 원칙을 적용하여 **유지보수성과 확장성을 극대화**하는 방법을 연구한 결과물입니다.
+이 프로젝트는 실제 레거시 환경(Java 8, Spring 3.2, Oracle 19c)에서의 제약사항을 고려하면서도, 최신 설계 패턴과 OOP 원칙을 적용하여 **유지보수성과 확장성을 극대화**하는 방법을 연구한 결과물입니다.
 
 특히 **ROI 중심의 의사결정 과정**을 명확히 문서화하여, 팀원들이 "왜 이렇게 만들었는가?"를 이해하고 향후 확장 시 동일한 원칙을 적용할 수 있도록 했습니다.
