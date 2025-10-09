@@ -13,7 +13,6 @@
 - [프로젝트 개요](#-프로젝트-개요)
 - [ROI 기반 핵심 설계 포인트](#-roi-기반-핵심-설계-포인트)
 - [아키텍처 진화 과정](#-아키텍처-진화-과정)
-- [기술 스택](#-기술-스택)
 - [주요 기능](#-주요-기능)
 - [테스트](#-테스트)
 - [성과 및 기여](#-성과-및-기여)
@@ -408,30 +407,6 @@ MailRequest.builder()
     .build();
 // → 발송 지점 n개 × 조합 m개 = Builder 메서드 8개로 모든 경우 커버
 ```
-
----
-
-## 🛠 기술 스택
-
-### Backend
-
-- **Language**: Java 17 (개발), Java 8 (운영 - 레거시 호환)
-- **Framework**: Spring Boot 3.5.x (개발), Spring Framework 3.2.x (운영)
-- **Persistence**: MyBatis 3.x + H2/Oracle 19c
-- **Mail**: JavaMailSender (SMTP)
-- **Build**: Gradle 8.x
-
-### Database
-
-- **Development**: H2 (In-memory, Oracle mode)
-- **Production**: Oracle 19c
-
-### Testing
-
-- **Framework**: JUnit 5, Mockito
-- **Coverage**: 181 tests (100% PASS)
-  - 단위 테스트: 163개
-  - 통합 테스트: 18개
 
 ---
 
