@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.Arrays;
 
 /**
  * 알람 메일 발송 서비스
@@ -78,6 +79,8 @@ public class AlarmMailService {
      *  - sqlId: SQL_ID (예: alarm.selectOverdueOrdersDetail)
      *  - sectionTitle: SECTION_TITLE (Procedure가 작성한 소제목)
      *  - sectionContent: SECTION_CONTENT (Procedure가 작성한 본문)
+     *  - recipientUserIds: RECIPIENT_USER_IDS (콤마 구분 사용자 ID, NULL 가능)
+     *  - recipientGroups: RECIPIENT_GROUPS (콤마 구분 그룹, NULL 가능)
      */
     private void processMessage(Map<String, Object> msg) {
         Long queueId = getLong(msg.get("queueId"));
@@ -88,20 +91,16 @@ public class AlarmMailService {
         String sectionContent = MailUtils.convertToString(msg.get("sectionContent"));
         Integer retryCount = getInteger(msg.get("retryCount"));
 
+        // 수신인 정보 읽기
+        String recipientUserIds = MailUtils.convertToString(msg.get("recipientUserIds"));
+        String recipientGroups = (String) msg.get("recipientGroups");
+
         try {
             // 1. SQL_ID로 테이블 데이터 조회
             List<Map<String, Object>> tableData = mailDao.selectList(sqlId, null);
 
-            // 2. ADM 그룹 조회 및 Recipient 변환
-            List<Map<String, Object>> admUserMaps = mailDao.selectList("alarm.selectAdmGroup", null);
-
-            if (admUserMaps == null || admUserMaps.isEmpty()) {
-                throw new IllegalStateException("ADM 그룹 사용자가 없습니다");
-            }
-
-            List<Recipient> admUsers = admUserMaps.stream()
-                    .map(Recipient::fromMap)
-                    .collect(Collectors.toList());
+            // 2. 수신인 목록 동적 조회
+            List<Recipient> recipients = resolveRecipients(recipientUserIds, recipientGroups);
 
             // 3. MailRequest 생성 (Builder + Helper Methods 사용)
             List<Map<String, String>> tableDataString = convertToStringMap(tableData);
@@ -109,7 +108,7 @@ public class AlarmMailService {
             MailRequest.Builder builder = MailRequest.builder()
                     .subject(MailRequest.alarmSubject(sectionTitle, severity, tableDataString.size()))
                     .addTextSection(MailRequest.alarmTitle(sectionTitle, severity), sectionContent)
-                    .recipients(admUsers)
+                    .recipients(recipients)
                     .mailType("ALARM")
                     .mailSource(mailSource);
 
@@ -123,12 +122,12 @@ public class AlarmMailService {
             // 4. MailService 호출 (발송 + 로그 자동 처리)
             mailService.sendMail(request);
 
-            // 6. 큐 성공 처리
+            // 5. 큐 성공 처리
             Map<String, Object> updateParams = new HashMap<>();
             updateParams.put("queueId", queueId);
             mailDao.update("alarm.updateQueueSuccess", updateParams);
 
-            System.out.println("✅ 알람 발송 성공: " + mailSource);
+            System.out.println("✅ 알람 발송 성공: " + mailSource + " (수신인 " + recipients.size() + "명)");
 
         } catch (Exception e) {
             handleFailure(queueId, mailSource, retryCount, e);
@@ -158,6 +157,74 @@ public class AlarmMailService {
             System.err.println("⚠️ 알람 발송 재시도 예정: " + mailSource +
                     " (시도 " + (retryCount + 2) + "/" + MAX_RETRY_COUNT + ")");
         }
+    }
+
+    /**
+     * 수신인 정보를 바탕으로 실제 Recipient 목록 생성
+     *
+     * @param recipientUserIds 콤마 구분 사용자 ID (예: "USER001,USER002", NULL 가능)
+     * @param recipientGroups 콤마 구분 그룹명 (예: "ADM,SALES", NULL 가능)
+     * @return 중복 제거된 Recipient 목록
+     */
+    private List<Recipient> resolveRecipients(String recipientUserIds, String recipientGroups) {
+        // 1. NULL 체크 및 기본값 설정 (알람 메일 전용)
+        boolean hasUserIds = recipientUserIds != null && !recipientUserIds.trim().isEmpty();
+        boolean hasGroups = recipientGroups != null && !recipientGroups.trim().isEmpty();
+
+        if (!hasUserIds && !hasGroups) {
+            // 둘 다 NULL이면 ADM 그룹을 기본값으로 설정
+            System.out.println("⚠️ 수신인 미지정 → ADM 그룹 기본 발송");
+            recipientGroups = "ADM";
+            hasGroups = true;
+        }
+
+        // 2. 콤마 구분 문자열을 List로 변환 (trim만 수행, 정규화는 Recipient 클래스에서 담당)
+        List<String> userIdList = hasUserIds
+                ? Arrays.stream(recipientUserIds.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.toList())
+                : Collections.emptyList();
+
+        List<String> groupList = hasGroups
+                ? Arrays.stream(recipientGroups.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.toList())
+                : Collections.emptyList();
+
+        // 3. MyBatis 파라미터 생성
+        Map<String, Object> params = new HashMap<>();
+        if (!userIdList.isEmpty()) {
+            params.put("userIds", userIdList);
+        }
+        if (!groupList.isEmpty()) {
+            params.put("groups", groupList);
+        }
+
+        // 4. 통합 쿼리 호출 (DISTINCT + IN 절)
+        List<Map<String, Object>> recipientMaps = mailDao.selectList("alarm.selectRecipientsByConditions", params);
+
+        // 5. Recipient 변환 및 이메일 기준 중복 제거
+        Set<Recipient> recipientSet = new LinkedHashSet<>();  // 순서 보장 + 중복 제거
+        recipientMaps.stream()
+                .map(Recipient::fromMap)
+                .forEach(recipientSet::add);
+
+        List<Recipient> recipients = new ArrayList<>(recipientSet);
+
+        // 6. 유효성 검증
+        if (recipients.isEmpty()) {
+            throw new IllegalStateException(
+                    "수신인 조회 결과가 없습니다. " +
+                            "userIds=" + userIdList + ", groups=" + groupList
+            );
+        }
+
+        System.out.println("📧 수신인 조회 완료: " + recipients.size() + "명 " +
+                "(userIds=" + userIdList.size() + ", groups=" + groupList.size() + ")");
+
+        return recipients;
     }
 
     /**

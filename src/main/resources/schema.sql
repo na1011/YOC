@@ -47,18 +47,20 @@ COMMENT ON COLUMN MAIL_SEND_LOG.RECIPIENTS IS '수신인 (콤마 구분: user1@a
 
 -- ==================== 3. 메일 알람 큐 ====================
 CREATE TABLE MAIL_QUEUE (
-                            QUEUE_ID         NUMBER          PRIMARY KEY,
-                            MAIL_SOURCE      VARCHAR2(100)   NOT NULL,
-                            ALARM_NAME       VARCHAR2(200)   NOT NULL,
-                            SEVERITY         VARCHAR2(20)    NOT NULL CHECK (SEVERITY IN ('INFO', 'WARNING', 'CRITICAL')),
-                            SQL_ID           VARCHAR2(200)   NOT NULL,
-                            SECTION_TITLE    VARCHAR2(500),
-                            SECTION_CONTENT  CLOB,
-                            STATUS           VARCHAR2(20)    NOT NULL CHECK (STATUS IN ('PENDING', 'SUCCESS', 'FAILED')),
-                            RETRY_COUNT      NUMBER          DEFAULT 0,
-                            ERROR_MESSAGE    VARCHAR2(2000),
-                            REG_DATE         DATE            DEFAULT SYSDATE,
-                            UPD_DATE         DATE
+                            QUEUE_ID            NUMBER          PRIMARY KEY,
+                            MAIL_SOURCE         VARCHAR2(100)   NOT NULL,
+                            ALARM_NAME          VARCHAR2(200)   NOT NULL,
+                            SEVERITY            VARCHAR2(20)    NOT NULL CHECK (SEVERITY IN ('INFO', 'WARNING', 'CRITICAL')),
+                            SQL_ID              VARCHAR2(200)   NOT NULL,
+                            SECTION_TITLE       VARCHAR2(500),
+                            SECTION_CONTENT     CLOB,
+                            RECIPIENT_USER_IDS  VARCHAR2(1000),
+                            RECIPIENT_GROUPS    VARCHAR2(1000),
+                            STATUS              VARCHAR2(20)    NOT NULL CHECK (STATUS IN ('PENDING', 'SUCCESS', 'FAILED')),
+                            RETRY_COUNT         NUMBER          DEFAULT 0,
+                            ERROR_MESSAGE       VARCHAR2(2000),
+                            REG_DATE            DATE            DEFAULT SYSDATE,
+                            UPD_DATE            DATE
 );
 
 CREATE INDEX IDX_MAIL_QUEUE_STATUS ON MAIL_QUEUE(STATUS, REG_DATE);
@@ -70,6 +72,8 @@ COMMENT ON COLUMN MAIL_QUEUE.SEVERITY IS '심각도 (INFO/WARNING/CRITICAL) - �
 COMMENT ON COLUMN MAIL_QUEUE.SQL_ID IS 'Consumer가 호출할 MyBatis SQL ID (예: alarm.selectOverdueOrdersDetail)';
 COMMENT ON COLUMN MAIL_QUEUE.SECTION_TITLE IS '메일 본문 섹션 소제목';
 COMMENT ON COLUMN MAIL_QUEUE.SECTION_CONTENT IS '메일 본문 섹션 내용 (TEXT)';
+COMMENT ON COLUMN MAIL_QUEUE.RECIPIENT_USER_IDS IS '수신 사용자 ID (콤마 구분, NULL 가능, 예: USER001,USER002)';
+COMMENT ON COLUMN MAIL_QUEUE.RECIPIENT_GROUPS IS '수신 그룹 (콤마 구분, NULL 가능, 둘 다 NULL이면 ADM 기본, 예: ADM,SALES)';
 
 
 -- ==================== 4. 사용자 정보 (테스트용) ====================

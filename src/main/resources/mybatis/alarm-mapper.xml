@@ -8,17 +8,19 @@
 
     <!-- 큐 조회 (PENDING 상태) -->
     <select id="selectPendingQueue" resultType="map">
-        SELECT QUEUE_ID         AS queueId,
-               MAIL_SOURCE      AS mailSource,
-               ALARM_NAME       AS alarmName,
-               SEVERITY         AS severity,
-               SQL_ID           AS sqlId,
-               SECTION_TITLE    AS sectionTitle,
-               SECTION_CONTENT  AS sectionContent,
-               STATUS           AS status,
-               RETRY_COUNT      AS retryCount,
-               ERROR_MESSAGE    AS errorMessage,
-               REG_DATE         AS regDate
+        SELECT QUEUE_ID            AS queueId,
+               MAIL_SOURCE         AS mailSource,
+               ALARM_NAME          AS alarmName,
+               SEVERITY            AS severity,
+               SQL_ID              AS sqlId,
+               SECTION_TITLE       AS sectionTitle,
+               SECTION_CONTENT     AS sectionContent,
+               RECIPIENT_USER_IDS  AS recipientUserIds,
+               RECIPIENT_GROUPS    AS recipientGroups,
+               STATUS              AS status,
+               RETRY_COUNT         AS retryCount,
+               ERROR_MESSAGE       AS errorMessage,
+               REG_DATE            AS regDate
         FROM MAIL_QUEUE
         WHERE STATUS = 'PENDING'
         ORDER BY REG_DATE ASC
@@ -109,6 +111,37 @@
         FROM USER_INFO
         WHERE USER_GROUP = #{userGroup}
           AND EMAIL IS NOT NULL
+        ORDER BY USER_NAME
+    </select>
+
+    <!-- 수신인 통합 조회 (사용자 ID + 그룹, DISTINCT로 중복 제거) -->
+    <select id="selectRecipientsByConditions" parameterType="map" resultType="map">
+        SELECT DISTINCT
+               EMAIL       AS email,
+               USER_ID     AS userId,
+               USER_NAME   AS userName,
+               USER_GROUP  AS userGroup
+        FROM USER_INFO
+        WHERE EMAIL IS NOT NULL
+        <if test="userIds != null or groups != null">
+          AND (
+            <if test="userIds != null and userIds.size() > 0">
+                USER_ID IN
+                <foreach collection="userIds" item="userId" open="(" separator="," close=")">
+                    #{userId}
+                </foreach>
+            </if>
+            <if test="userIds != null and userIds.size() > 0 and groups != null and groups.size() > 0">
+                OR
+            </if>
+            <if test="groups != null and groups.size() > 0">
+                USER_GROUP IN
+                <foreach collection="groups" item="group" open="(" separator="," close=")">
+                    #{group}
+                </foreach>
+            </if>
+          )
+        </if>
         ORDER BY USER_NAME
     </select>
 

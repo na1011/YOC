@@ -4,7 +4,7 @@
 [![Java](https://img.shields.io/badge/Java-17%20%7C%208-orange)](https://www.oracle.com/java/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.x-brightgreen)](https://spring.io/projects/spring-boot)
 [![MyBatis](https://img.shields.io/badge/MyBatis-3.x-blue)](https://mybatis.org/mybatis-3/)
-[![Test Coverage](https://img.shields.io/badge/Tests-181%20passed-success)](https://github.com)
+[![Test Coverage](https://img.shields.io/badge/Tests-197%20passed-success)](https://github.com)
 
 ---
 
@@ -241,7 +241,7 @@ Spring @Scheduled (Consumer) ← 메일 발송, 재시도, 로깅
 
 **장기 유지보수 관점**:
 - 강타입 DTO 도입 시: DTO 클래스 20개 이상 신규 작성 + 유지보수 필요
-- Map 유지 시: 클래스 추가 및 유지보수 없음 + 타입 변환 및 런타임 검증 로직 추가 (현재 181개 테스트, 100% PASS)
+- Map 유지 시: 클래스 추가 및 유지보수 없음 + 타입 변환 및 런타임 검증 로직 추가 (현재 197개 테스트, 100% PASS)
 
 #### 3. Helper 메서드 (정적 메서드) vs Strategy 패턴
 
@@ -413,10 +413,12 @@ public void sendMail(MailRequest request) {
 
 ---
 
-### Phase 3: Builder + Helper 메서드 (v2.0.0, 현재)
+### Phase 3: Builder + Helper 메서드 도입 (v2.0.0, 현재)
+
+**핵심 개선: 유연한 메일 구성**
 
 ```java
-// 유연한 조합 + 도메인 로직 재사용
+// 1. 유연한 섹션 조합 + 도메인 로직 재사용
 MailRequest.builder()
     .subject(MailRequest.alarmSubject(title, severity, count))  // Helper 메서드
     .addTextSection(MailRequest.alarmTitle(title, severity), content)
@@ -433,38 +435,6 @@ MailRequest.builder()
 - ✅ **도메인 로직 집중화**: Subject 패턴, 아이콘 표준이 Helper 메서드에 캡슐화
 - ✅ **메타데이터 지원**: `Map<String, Object>`로 boolean/numeric 값 지원
 - ✅ **확장성**: Factory 메서드 20개 → Builder 메서드 8개로 모든 조합 커버
-
-**발송 지점 확장 시 유지보수 비용 비교 (핵심 차이점)**:
-
-| 시나리오 | Factory/Template 패턴 | Builder + Helper 메서드 | ROI |
-|---------|------------------------|-------------------------|-----|
-| **발송 지점 1개 → 10개 증가** | Factory 메서드 10개 추가 필요 | Helper 메서드 재사용 (코드 중복 0줄) | **-10개 메서드** |
-| **새로운 섹션 조합 추가** | `forAlarmWithTable()`, `forAlarmWithChart()`, `forAlarmWithTableAndChart()` → **조합 폭발** | `.addTableSection().addChartSection()` → **자유로운 조합** | **무한한 조합** |
-| **발송 지점별 커스텀 요구사항** | 각 발송 지점마다 전용 Factory 메서드 필요 (예: `forInventoryAlarm()`, `forOrderAlarm()`) | Helper 메서드 조합으로 해결 (Factory 메서드 추가 불필요) | **O(1) 유지보수** |
-| **예시: 10개 발송 지점 × 3가지 조합** | Factory 메서드 30개 작성 및 유지보수 | Builder 메서드 8개 재사용 | **-22개 메서드 (73% 감소)** |
-
-**구체적 예시**:
-```java
-// ❌ Factory 패턴: 발송 지점/조합마다 Factory 메서드 추가 필요 (조합 폭발)
-MailSection.forInventoryAlarmWithTable(...)     // 1. 재고 + 테이블
-MailSection.forInventoryAlarmWithChart(...)     // 2. 재고 + 차트
-MailSection.forInventoryAlarmWithBoth(...)      // 3. 재고 + 테이블 + 차트
-MailSection.forOrderAlarmWithTable(...)         // 4. 주문 + 테이블
-MailSection.forOrderAlarmWithChart(...)         // 5. 주문 + 차트
-MailSection.forOrderAlarmWithBoth(...)          // 6. 주문 + 테이블 + 차트
-// → 발송 지점 10개 × 조합 3가지 = Factory 메서드 30개 필요
-
-// ✅ Builder + Helper 메서드: 동일 메서드로 모든 조합 처리 (조합 재사용)
-MailRequest.builder()
-    .subject(MailRequest.alarmSubject(title, severity, count))  // 1개 메서드
-    .addTextSection(MailRequest.alarmTitle(title, severity), content)
-    .addTableSection(tableData)          // 조합 1
-    .addChartSection(chartData)          // 조합 2
-    .addTableSection(tableData)          // 조합 3
-    .addChartSection(chartData)
-    .build();
-// → 발송 지점 n개 × 조합 m개 = Builder 메서드 8개로 모든 경우 커버
-```
 
 ---
 
@@ -539,9 +509,9 @@ SELECT * FROM MAIL_QUEUE WHERE STATUS = 'PENDING';
 ---
 
 ## 🧪 테스트 커버리지
-- **총 181개 테스트, 100% PASS**
+- **총 197개 테스트, 100% PASS**
 
-### 단위 테스트 (163개)
+### 단위 테스트 (185개)
 ```
 MailSectionTest: 
 - Factory 메서드, 검증 로직, 메타데이터, 심각도 아이콘
@@ -549,22 +519,22 @@ MailSectionTest:
 MailRequestTest: 
 - Builder + Helper 메서드 패턴, Subject 생성, 검증
 
-RecipientTest: 
-- Builder, fromMap 변환, 엣지케이스
+RecipientTest (14개):
+- Builder 패턴, fromMap 변환, 대소문자 정규화, 중복 제거, 엣지케이스
 
-MailBodyRendererTest: 
+MailBodyRendererTest:
 - SectionType별 렌더링, HTML 이스케이프
 
-MailUtilsTest: 
+MailUtilsTest:
 - 이메일 검증, CLOB 변환, 수신인 검증
 
-MailServiceTest: 
+MailServiceTest:
 - 발송 흐름, 재시도 로직, 로그 생성
 
-AlarmMailServiceTest: 
-- 큐 처리, 실패 핸들링, 타입 변환
+AlarmMailServiceTest (30개):
+- 큐 처리, resolveRecipients 동적 수신인 조회, 실패 핸들링, 타입 변환
 ```
-### 통합 테스트 (18개)
+### 통합 테스트 (12개)
 ```
 MailServiceIntegrationTest (7개)
 - 실제 메일 발송, DB 연동, 로그 검증
@@ -597,7 +567,7 @@ AlarmMailServiceIntegrationTest (11개)
 
 - **코드 간결화**: 총 188줄 감소 (MailService 36%, MailDao 53%)
 - **순환 복잡도 감소**: 23 → 6 (74% 감소)
-- **테스트 커버리지**: 181개 테스트, 100% PASS
+- **테스트 커버리지**: 197개 테스트, 100% PASS
 
 ### 2. 관리 포인트 감소
 

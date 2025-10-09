@@ -30,8 +30,8 @@ class RecipientTest {
             .group("ADM")
             .build();
 
-        // Then
-        assertEquals("hong123", recipient.getUserId());
+        // Then - USER_ID는 대문자로 정규화됨
+        assertEquals("HONG123", recipient.getUserId());
         assertEquals("hong@company.com", recipient.getEmail());
         assertEquals("ADM", recipient.getGroup());
     }
@@ -45,8 +45,8 @@ class RecipientTest {
             .email("user1@company.com")
             .build();
 
-        // Then
-        assertEquals("user1", recipient.getUserId());
+        // Then - USER_ID는 대문자로 정규화됨
+        assertEquals("USER1", recipient.getUserId());
         assertEquals("user1@company.com", recipient.getEmail());
         assertNull(recipient.getGroup());
     }
@@ -77,8 +77,8 @@ class RecipientTest {
         // When
         Recipient recipient = Recipient.fromMap(map);
 
-        // Then
-        assertEquals("kim456", recipient.getUserId());
+        // Then - USER_ID는 대문자로 정규화됨
+        assertEquals("KIM456", recipient.getUserId());
         assertEquals("kim@company.com", recipient.getEmail());
         assertEquals("DEV", recipient.getGroup());
     }
@@ -94,8 +94,8 @@ class RecipientTest {
         // When
         Recipient recipient = Recipient.fromMap(map);
 
-        // Then
-        assertEquals("user2", recipient.getUserId());
+        // Then - USER_ID는 대문자로 정규화됨
+        assertEquals("USER2", recipient.getUserId());
         assertEquals("user2@company.com", recipient.getEmail());
         assertNull(recipient.getGroup());
     }
@@ -164,8 +164,8 @@ class RecipientTest {
         // When
         String result = recipient.toString();
 
-        // Then
-        assertTrue(result.contains("test"));
+        // Then - USER_ID는 대문자로 정규화됨
+        assertTrue(result.contains("TEST"));
         assertTrue(result.contains("test@company.com"));
         assertTrue(result.contains("ADM"));
     }
@@ -181,9 +181,9 @@ class RecipientTest {
         // When
         String result = recipient.toString();
 
-        // Then
+        // Then - USER_ID는 대문자로 정규화됨
         assertNotNull(result);
-        assertTrue(result.contains("user"));
+        assertTrue(result.contains("USER"));
         assertTrue(result.contains("null"));
     }
 
@@ -199,7 +199,7 @@ class RecipientTest {
             .group("")
             .build();
 
-        // Then
+        // Then - 빈 문자열도 toUpperCase() 적용되지만 결과는 동일
         assertEquals("", recipient.getUserId());
         assertEquals("", recipient.getEmail());
         assertEquals("", recipient.getGroup());
@@ -215,7 +215,7 @@ class RecipientTest {
             .group("   ")
             .build();
 
-        // Then
+        // Then - 공백도 toUpperCase() 적용되지만 결과는 동일
         assertEquals("   ", recipient.getUserId());
         assertEquals("   ", recipient.getEmail());
         assertEquals("   ", recipient.getGroup());
@@ -231,8 +231,8 @@ class RecipientTest {
             .group("ADM-DEV")
             .build();
 
-        // Then
-        assertEquals("user@123", recipient.getUserId());
+        // Then - USER_ID는 대문자로 정규화됨
+        assertEquals("USER@123", recipient.getUserId());
         assertEquals("test+tag@company.com", recipient.getEmail());
         assertEquals("ADM-DEV", recipient.getGroup());
     }
@@ -242,6 +242,7 @@ class RecipientTest {
     void edgeCase_longString() {
         // Given
         String longString = "a".repeat(1000);
+        String longStringUpper = "A".repeat(1000);
 
         // When
         Recipient recipient = Recipient.builder()
@@ -250,9 +251,9 @@ class RecipientTest {
             .group(longString)
             .build();
 
-        // Then
-        assertEquals(longString, recipient.getUserId());
+        // Then - USER_ID는 대문자로 정규화됨, group은 정규화 안 됨
+        assertEquals(longStringUpper, recipient.getUserId());
         assertTrue(recipient.getEmail().startsWith(longString));
-        assertEquals(longString, recipient.getGroup());
+        assertEquals(longString, recipient.getGroup());  // group은 그대로 유지
     }
 }
