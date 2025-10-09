@@ -1,4 +1,5 @@
 # WMS 메일 발송 시스템
+> **영원아웃도어 메일 발송 시스템 개발용 사이드 프로젝트**
 
 [![Java](https://img.shields.io/badge/Java-17%20%7C%208-orange)](https://www.oracle.com/java/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.x-brightgreen)](https://spring.io/projects/spring-boot)
@@ -21,9 +22,9 @@
 
 ## 🎯 프로젝트 개요
 
->### 비즈니스 배경
->
->WMS 운영 환경에서는 **다양한 도메인 이벤트**에 대한 이메일 알림이 필요합니다:
+### 비즈니스 배경
+
+WMS 운영 환경에서는 **다양한 도메인 이벤트**에 대한 이메일 알림이 필요합니다:
 
 - **스케줄 기반 알림**: 재고 부족, 주문 지연, 시스템 장애
 - **이벤트 드리븐 알림**: 재고할당 완료, 대량 데이터 처리 완료, 배치 작업 성공/실패
@@ -33,9 +34,9 @@
 - 현재: AlarmMailService (큐 기반 Consumer) 1개
 - 향후: InventoryService, OrderService, BatchService 등 **10개 이상의 발송 지점**
 
->### 도출된 문제점 (확장성 관점)
->
->기존 시스템은 **발송 지점 증가 시 유지보수 비용이 선형적으로 증가**하는 구조였습니다:
+### 도출된 문제점 (확장성 관점)
+
+기존 시스템은 **발송 지점 증가 시 유지보수 비용이 선형적으로 증가**하는 구조였습니다:
 
 1. **강결합**: 각 발송 지점이 `MailSection` 객체를 직접 생성 → 내부 구조 변경 시 전체 수정 필요
 2. **고정된 섹션 조합 (Factory 패턴 한계)**: 템플릿 기반 고정 조합 → 새로운 조합마다 Factory 메서드 추가 (조합 폭발)
