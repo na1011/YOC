@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="alarm">
+
+    <!-- ==================== 통합 테스트용 쿼리 ==================== -->
+
+    <!-- ==================== 큐 관리 (main과 동일) ==================== -->
+
+    <!-- 큐 조회 (PENDING 상태) -->
+    <select id="selectPendingQueue" resultType="map">
+        SELECT QUEUE_ID         AS queueId,
+               MAIL_SOURCE      AS mailSource,
+               ALARM_NAME       AS alarmName,
+               SEVERITY         AS severity,
+               SQL_ID           AS sqlId,
+               SECTION_TITLE    AS sectionTitle,
+               SECTION_CONTENT  AS sectionContent,
+               STATUS           AS status,
+               RETRY_COUNT      AS retryCount,
+               ERROR_MESSAGE    AS errorMessage,
+               REG_DATE         AS regDate
+        FROM MAIL_QUEUE
+        WHERE STATUS = 'PENDING'
+        ORDER BY REG_DATE ASC
+            FETCH FIRST 10 ROWS ONLY
+    </select>
+
+    <!-- 큐 상태 업데이트: SUCCESS -->
+    <update id="updateQueueSuccess" parameterType="map">
+        UPDATE MAIL_QUEUE
+        SET STATUS = 'SUCCESS',
+            UPD_DATE = SYSDATE
+        WHERE QUEUE_ID = #{queueId}
+    </update>
+
+    <!-- 큐 상태 업데이트: RETRY -->
+    <update id="updateQueueRetry" parameterType="map">
+        UPDATE MAIL_QUEUE
+        SET RETRY_COUNT = RETRY_COUNT + 1,
+            ERROR_MESSAGE = #{errorMessage},
+            UPD_DATE = SYSDATE
+        WHERE QUEUE_ID = #{queueId}
+    </update>
+
+    <!-- 큐 상태 업데이트: FAILED -->
+    <update id="updateQueueFailed" parameterType="map">
+        UPDATE MAIL_QUEUE
+        SET STATUS = 'FAILED',
+            ERROR_MESSAGE = #{errorMessage},
+            UPD_DATE = SYSDATE
+        WHERE QUEUE_ID = #{queueId}
+    </update>
+
+
+    <!-- ==================== Consumer가 호출할 Detail 쿼리 (SQL_ID) ==================== -->
+
+    <!-- 지연 주문 상세 조회 -->
+    <select id="selectOverdueOrdersDetail" resultType="map">
+        SELECT ORDER_ID      AS orderId,
+               CUSTOMER_NAME AS customer,
+               TO_CHAR(ORDER_DATE, 'YYYY-MM-DD') AS orderDate,
+               DAYS_OVERDUE  AS daysOverdue
+        FROM ORDERS
+        WHERE STATUS = 'DELAYED'
+          AND DAYS_OVERDUE >= 3
+        ORDER BY DAYS_OVERDUE DESC
+    </select>
+
+    <!-- 재고 부족 상세 조회 -->
+    <select id="selectLowStockDetail" resultType="map">
+        SELECT WAREHOUSE_CODE AS warehouseCode,
+               PRODUCT_CODE   AS productCode,
+               PRODUCT_NAME   AS productName,
+               STOCK_QTY      AS currentStock,
+               MIN_STOCK_QTY  AS minStock
+        FROM INVENTORY
+        WHERE STOCK_QTY &lt; MIN_STOCK_QTY
+        ORDER BY STOCK_QTY ASC
+    </select>
+
+
+    <!-- ==================== 사용자 조회 (main과 동일) ==================== -->
+
+    <!-- ADM 그룹 사용자 조회 -->
+    <select id="selectAdmGroup" resultType="map">
+        SELECT USER_ID   AS userId,
+               USER_NAME AS userName,
+               EMAIL     AS email,
+               USER_GROUP AS userGroup
+        FROM USER_INFO
+        WHERE USER_GROUP = 'ADM'
+          AND EMAIL IS NOT NULL
+        ORDER BY USER_NAME
+    </select>
+
+
+    <!-- ==================== 테스트 전용 쿼리 ==================== -->
+
+    <!-- 테스트용 큐 강제 삽입 (Producer 시뮬레이션) -->
+    <insert id="insertTestQueue" parameterType="map">
+        INSERT INTO MAIL_QUEUE (
+            QUEUE_ID, MAIL_SOURCE, ALARM_NAME, SEVERITY,
+            SQL_ID, SECTION_TITLE, SECTION_CONTENT,
+            STATUS, RETRY_COUNT, REG_DATE
+        ) VALUES (
+            NEXT VALUE FOR SEQ_MAIL_QUEUE,
+            #{mailSource}, #{alarmName}, #{severity},
+            #{sqlId}, #{sectionTitle}, #{sectionContent},
+            'PENDING', #{retryCount, jdbcType=INTEGER}, SYSDATE
+        )
+    </insert>
+
+    <!-- 특정 큐 조회 (검증용) - Map 구조: queueId, mailSource, status, retryCount, errorMessage 등 -->
+    <select id="selectQueueById" parameterType="long" resultType="map">
+        SELECT QUEUE_ID         AS queueId,
+               MAIL_SOURCE      AS mailSource,
+               ALARM_NAME       AS alarmName,
+               SEVERITY         AS severity,
+               SQL_ID           AS sqlId,
+               SECTION_TITLE    AS sectionTitle,
+               SECTION_CONTENT  AS sectionContent,
+               STATUS           AS status,
+               RETRY_COUNT      AS retryCount,
+               ERROR_MESSAGE    AS errorMessage,
+               REG_DATE         AS regDate,
+               UPD_DATE         AS updDate
+        FROM MAIL_QUEUE
+        WHERE QUEUE_ID = #{queueId}
+    </select>
+
+    <!-- 특정 MAIL_SOURCE의 큐 조회 (중복 방지 검증용) -->
+    <select id="selectQueueByMailSource" parameterType="string" resultType="map">
+        SELECT QUEUE_ID         AS queueId,
+               MAIL_SOURCE      AS mailSource,
+               STATUS           AS status,
+               RETRY_COUNT      AS retryCount,
+               REG_DATE         AS regDate
+        FROM MAIL_QUEUE
+        WHERE MAIL_SOURCE = #{mailSource}
+        ORDER BY REG_DATE DESC
+    </select>
+
+    <!-- 큐 전체 삭제 (테스트 초기화) -->
+    <delete id="deleteAllQueue">
+        DELETE FROM MAIL_QUEUE
+    </delete>
+
+    <!-- 빈 데이터 쿼리 (시나리오 8용 - 테이블 섹션 생략 검증) -->
+    <select id="selectNonExistentData" resultType="map">
+        SELECT ORDER_ID      AS orderId,
+               CUSTOMER_NAME AS customer
+        FROM ORDERS
+        WHERE 1=0
+    </select>
+
+</mapper>

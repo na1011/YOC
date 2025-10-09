@@ -1,0 +1,70 @@
+-- ==================== WMS 메일 시스템 초기 데이터 (H2 환경 전용) ====================
+
+-- ==================== 사용자 정보 ====================
+-- 테스트 사용자
+INSERT INTO USER_INFO VALUES
+    ('admin1', '관리자1', 'admin1@example.com', 'ADM', SYSDATE);
+
+INSERT INTO USER_INFO VALUES
+    ('admin2', '관리자2', 'admin2@example.com', 'ADM', SYSDATE);
+
+INSERT INTO USER_INFO VALUES
+    ('user1', '사용자1', 'user1@example.com', 'USER', SYSDATE);
+
+
+-- ==================== 알람 큐 테스트 데이터 ====================
+-- 테스트용 QUEUE 데이터 (H2 환경 전용 - Producer 시뮬레이션)
+INSERT INTO MAIL_QUEUE VALUES (
+    1,
+    'OVERDUE_ORDERS',
+    '지연 주문 알림',
+    'WARNING',
+    'alarm.selectOverdueOrdersDetail',
+    '지연 주문 현황',
+    '현재 출고 예정일이 5일 이상 지연된 주문 건이 발생했습니다. 조속히 확인 바랍니다.',
+    'PENDING',
+    0,
+    NULL,
+    SYSDATE,
+    NULL
+);
+
+INSERT INTO MAIL_QUEUE VALUES (
+    2,
+    'LOW_STOCK',
+    '재고 부족 알림',
+    'CRITICAL',
+    'alarm.selectLowStockDetail',
+    '재고 부족 현황',
+    '최소 재고 수량 미만인 상품이 발견되었습니다. 긴급히 입고 조치가 필요합니다.',
+    'PENDING',
+    0,
+    NULL,
+    SYSDATE,
+    NULL
+);
+
+
+-- ==================== 더미 주문 데이터 ====================
+-- 지연 주문 더미 데이터 (SQL_ID: alarm.selectOverdueOrdersDetail 조회용)
+INSERT INTO ORDERS VALUES
+    ('ORD-2025-001', 'A 고객사', TO_DATE('2025-01-01', 'YYYY-MM-DD'), 'OVERDUE', 7);
+
+INSERT INTO ORDERS VALUES
+    ('ORD-2025-002', 'B 고객사', TO_DATE('2025-01-02', 'YYYY-MM-DD'), 'OVERDUE', 6);
+
+INSERT INTO ORDERS VALUES
+    ('ORD-2025-003', 'C 고객사', TO_DATE('2025-01-03', 'YYYY-MM-DD'), 'OVERDUE', 5);
+
+
+-- ==================== 더미 재고 데이터 ====================
+-- 재고 부족 더미 데이터 (SQL_ID: alarm.selectLowStockDetail 조회용)
+INSERT INTO INVENTORY VALUES
+    ('WH-A', 'PROD-001', '스마트폰 갤럭시', 3, 10);
+
+INSERT INTO INVENTORY VALUES
+    ('WH-B', 'PROD-002', '태블릿 아이패드', 5, 20);
+
+
+-- ==================== 커밋 ====================
+COMMIT;
