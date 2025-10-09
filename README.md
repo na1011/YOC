@@ -63,12 +63,26 @@ WMS 운영 환경에서는 **다양한 도메인 이벤트**에 대한 이메일
 - ...
 ```
 
-**기존 Factory 패턴의 한계**:
+**기존 Factory 패턴의 한계 (Phase 2)**:
 ```java
-// 각 발송 지점이 MailSection을 직접 알아야 함 (강결합)
-List<MailSection> sections = MailSection.forAlarm(name, severity, tableData);
-// → 내부 구조 변경 시 모든 발송 지점 수정 필요
-// → 발송 지점 10개 시 변경 비용 10배 증가
+// 1. Factory 메서드로 섹션 생성
+List<MailSection> sections = MailSection.forAlarm(title, severity, tableData);
+
+// 2. MailRequest 빌드 (섹션 리스트를 전달)
+MailRequest request = MailRequest.builder()
+    .subject("[긴급] 알림")
+    .sections(sections)  // ← Factory가 생성한 섹션 리스트
+    .recipients(admUsers)
+    .build();
+
+// 3. 메일 발송
+mailService.sendMail(request);
+
+// 문제점:
+// - 발송 지점이 여전히 MailSection을 간접 의존 (import 필요)
+// - Factory 메서드 변경 시 모든 발송 지점 영향 가능성
+// - 고정된 조합만 가능 (커스텀 조합 시 Factory 메서드 추가 필요)
+// - MailService 내부 템플릿/Factory 분기 로직 (순환 복잡도 23)
 ```
 
 #### 해결: 정보 은닉 + 파사드 패턴
@@ -315,43 +329,87 @@ MailSection tableSection = MailSection.builder()
 
 ---
 
-### Phase 2: 템플릿/Factory 분기 처리 (v1.0.0)
+### Phase 2: Factory 패턴 도입 (v1.0.0)
 
-**MailService에서 메일 타입별 분기 처리**
+**Factory Method로 고정 섹션 조합 추상화**
+
+Phase 2에서는 각 메일 타입별로 Factory 메서드를 제공하여 섹션 생성을 캡슐화했습니다:
 
 ```java
-// MailService.sendMail() 내부 분기
-public void sendMail(String mailType, Map<String, Object> params) {
-    if ("ALARM".equals(mailType)) {
-        // Factory 메서드 사용
-        List<MailSection> sections = MailSection.forAlarm(
-            (String) params.get("title"),
-            (String) params.get("severity"),
-            (List) params.get("tableData")
-        );
-    } else if ("NOTICE".equals(mailType)) {
-        // DB 템플릿 사용
-        String template = mailDao.selectTemplateByType("NOTICE");
-        String bodyHtml = replaceVariables(template, params);
+// 1. MailSection.java - Factory 메서드로 섹션 리스트 생성
+public static List<MailSection> forAlarm(String title, String severity, List<Map<String, String>> tableData) {
+    List<MailSection> sections = new ArrayList<>();
+
+    // 텍스트 섹션 (아이콘 + 제목)
+    sections.add(MailSection.builder()
+        .type(SectionType.TEXT)
+        .title(getSeverityIcon(severity) + " " + title)
+        .content("긴급 처리가 필요합니다.")
+        .build());
+
+    // 테이블 섹션
+    sections.add(MailSection.builder()
+        .type(SectionType.TABLE)
+        .data(tableData)
+        .build());
+
+    // 구분선
+    sections.add(MailSection.builder()
+        .type(SectionType.DIVIDER)
+        .build());
+
+    return sections;  // 고정된 3개 섹션 조합 반환
+}
+
+// 2. 발송 지점 - Factory 메서드로 섹션 생성
+List<MailSection> sections = MailSection.forAlarm("재고 부족", "CRITICAL", tableData);
+
+// 3. MailService.sendMail() 내부 - 템플릿/Factory 분기 처리
+public void sendMail(MailRequest request) {
+    String bodyHtml;
+
+    if (request.getSections() != null && !request.getSections().isEmpty()) {
+        // Factory 패턴 사용 (섹션 기반)
+        bodyHtml = mailBodyRenderer.render(request.getSections());
+    } else {
+        // DB 템플릿 사용 (레거시)
+        String template = mailDao.selectTemplateByType(request.getMailType());
+        bodyHtml = replaceVariables(template, request.getParams());
     }
+
     // ... 발송 로직
 }
 ```
 
 **개선 효과**:
-- ✅ 알람 메일은 Factory 메서드로 코드 간소화 (30줄 → 5줄)
-- ✅ 템플릿 의존성 점진적 제거 (알람 타입만 먼저 전환)
+- ✅ **코드 간소화**: 각 발송 지점에서 20줄 → 3줄 (Factory 메서드 호출만)
+- ✅ **관리 포인트 감소**: 섹션 구조 변경 시 Factory 메서드 한 곳만 수정
+- ✅ **타입 안전성**: 컴파일 타임 검증 가능
+- ✅ **의도 명확**: `forAlarm()`, `forNotice()` 등 메서드명으로 목적 명확
 
-**한계**:
-- ⚠️ **MailService 비대화**: 타입별 분기 로직 증가 → 순환 복잡도 23
-- ⚠️ **이중 체계 유지**: 템플릿 시스템 + Factory 패턴 공존 → 관리 포인트 2곳
-- ⚠️ **Factory 메서드 조합 폭발**: `forAlarm()`, `forAlarmWithChart()`, `forAlarmWithTable()` 등 조합마다 메서드 추가 필요
-- ⚠️ **확장성 부족**: 새로운 조합 필요 시 Factory 메서드 계속 추가 (발송 지점 10개 × 조합 3가지 = 30개 메서드)
+**한계 및 문제점**:
+- 🔴 **고정된 섹션 조합**: Factory 메서드가 반환하는 섹션 구조가 고정됨
+  - `forAlarm()` → 항상 "텍스트 + 테이블 + 구분선" 3개 섹션
+  - 커스텀 조합 불가능 (예: 테이블 없이 텍스트만, 또는 차트 추가)
+
+- 🔴 **조합 경직성**:
+  - 새로운 조합마다 Factory 메서드 추가 필요
+  - `forAlarm()`, `forAlarmWithoutTable()`, `forAlarmWithChart()`, `forAlarmWithTableAndChart()` ...
+  - 발송 지점 10개 × 조합 3가지 = **30개 Factory 메서드 필요**
+
+- 🔴 **MailService 비대화**:
+  - 템플릿/Factory 분기 로직으로 순환 복잡도 23
+  - 이중 체계 유지 (템플릿 시스템 + Factory 패턴 공존) → 관리 포인트 2곳
+
+- 🔴 **서비스 계층 결합도**:
+  - 발송 지점이 여전히 `MailSection`을 알아야 함 (간접 의존)
+  - Factory 메서드 변경 시 발송 지점 영향 가능성
 
 **실제 사용 패턴 분석 결과**:
 - 알람 메일의 **70%가 동적 섹션 조합 필요**
-- 예: "텍스트 + 테이블 + 구분선 + 추가 안내 + HTML 차트"
-- Factory 패턴으로는 모든 조합을 커버할 수 없음 → **근본적인 리팩토링 필요**
+  - 예: "텍스트 + 테이블 + 구분선 + 추가 안내 텍스트 + HTML 차트"
+  - Factory 메서드로는 모든 조합을 커버할 수 없음
+- **근본적인 패러다임 전환 필요** → Builder + Helper Methods 패턴으로 리팩토링
 
 ---
 
