@@ -24,7 +24,7 @@ public enum SectionType {
 
     public static SectionType fromCode(String code) {
         if (code == null || code.trim().isEmpty()) {
-            throw new IllegalArgumentException("Section type code cannot be null or empty");
+            throw new IllegalArgumentException("섹션 타입은 null일 수 없습니다.");
         }
 
         for (SectionType type : values()) {
@@ -33,6 +33,6 @@ public enum SectionType {
             }
         }
 
-        throw new IllegalArgumentException("Unknown section type: " + code);
+        throw new IllegalArgumentException("정의되지 않은 섹션 타입: " + code);
     }
 }

@@ -15,15 +15,9 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * MailService 통합 테스트
+ * MailService 실제 메일 발송 테스트
  *
- * 실제 Gmail SMTP와 H2 DB를 사용하여 메일 발송 기능 검증
- *
- * 테스트 범위:
- * - MailService의 메일 발송 기능만 테스트
- * - AlarmMailService는 제외 (별도 테스트 필요 시 생성)
- *
- * 테스트 시나리오:
+ * - 시나리오 구성
  * 1. 단일 섹션 메일 (텍스트만)
  * 2. 복수 섹션 메일 (텍스트 + 테이블 + 구분선 + 텍스트) - 범용 Builder 사용
  * 3. 알람 메일 (Helper Methods 사용)
@@ -31,11 +25,6 @@ import static org.junit.jupiter.api.Assertions.*;
  * 5. 공지 메일 (Helper Methods 사용)
  * 6. CC 포함 메일
  * 7. 발송 로그 검증
- *
- * 주의사항:
- * - 실제 이메일이 발송되므로 테스트 실행 시 주의
- * - @Disabled 제거 후 실행
- * - Gmail 계정 앱 비밀번호 필요
  */
 @SpringBootTest
 @ActiveProfiles("integration")

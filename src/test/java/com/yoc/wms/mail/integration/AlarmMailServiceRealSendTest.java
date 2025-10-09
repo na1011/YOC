@@ -14,19 +14,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * AlarmMailService 실제 메일 발송 테스트
  *
- * <h3>목적</h3>
- * 메일이 실제로 어떻게 보여지는지 눈으로 확인하기 위한 테스트
- * (엣지케이스 검증은 AlarmMailServiceIntegrationTest에서 수행)
- *
- * <h3>주의사항</h3>
- * <ul>
- *   <li>실제 Gmail SMTP를 통해 메일이 발송됩니다</li>
- *   <li>@Disabled 제거 후 실행 필요</li>
- *   <li>수신자: test-data-integration.sql의 ADM 그룹 사용자</li>
- *   <li>Gmail 계정 앱 비밀번호 필요 (application-integration.properties)</li>
- * </ul>
- *
- * <h3>시나리오</h3>
+ * - 시나리오 구성
  * 1. CRITICAL 알람 (지연 주문)
  * 2. WARNING 알람 (재고 부족)
  * 3. INFO 알람 (시스템 공지)

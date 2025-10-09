@@ -10,6 +10,9 @@ import java.util.Map;
 
 /**
  * 메일 본문 렌더러
+ *
+ *  @author 김찬기
+ *  @since 1.0
  */
 @Component
 public class MailBodyRenderer {

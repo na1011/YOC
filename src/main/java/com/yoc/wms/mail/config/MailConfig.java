@@ -5,9 +5,10 @@ import org.springframework.stereotype.Component;
 
 /**
  * 메일 스타일 통합 설정
- *
- * Spring 3.2 / Spring Boot 모두 호환
  * properties 파일에서 값 로드
+ *
+ *  @author 김찬기
+ *  @since 1.0
  */
 @Component
 public class MailConfig {

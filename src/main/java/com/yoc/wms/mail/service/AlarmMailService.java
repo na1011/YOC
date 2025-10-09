@@ -13,20 +13,13 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * 알람 메일 발송 서비스 (Consumer Only)
+ * 알람 메일 발송 서비스
  *
- * <h3>아키텍처</h3>
- * <ul>
- *   <li>Producer: Oracle Procedure가 MAIL_QUEUE에 INSERT (운영환경)</li>
- *   <li>Consumer: Spring이 QUEUE를 읽어 SQL_ID 호출 후 메일 발송 (이 클래스)</li>
- * </ul>
+ * -Producer: Oracle Procedure가 MAIL_QUEUE에 INSERT
+ * -Consumer: Spring이 QUEUE를 읽어 SQL_ID 호출 후 메일 발송
  *
- * <h3>H2 환경 시뮬레이션</h3>
- * <ul>
- *   <li>Producer: 비활성화 (@Scheduled collectAlarms 동작 안 함)</li>
- *   <li>QUEUE 초기 데이터: schema.sql에 INSERT</li>
- *   <li>Consumer: 정상 동작 (processQueue)</li>
- * </ul>
+ *  @author 김찬기
+ *  @since 1.0
  */
 @Service
 public class AlarmMailService {
@@ -40,13 +33,7 @@ public class AlarmMailService {
     private static final int MAX_RETRY_COUNT = 3;
 
     /**
-     * Producer: H2 환경에서는 비활성화
-     *
-     * <p>운영환경에서는 Oracle Scheduler가 Procedure를 호출하여
-     * MAIL_QUEUE에 데이터를 INSERT 합니다.
-     *
-     * <p>H2 환경에서는 data.sql에 테스트 데이터가 미리 삽입되어 있어
-     * 이 메서드는 실행되지 않습니다.
+     * Producer
      */
     @Scheduled(cron = "0 */30 * * * *")
     @Transactional
@@ -83,16 +70,14 @@ public class AlarmMailService {
     /**
      * 개별 메시지 처리
      *
-     * <p>QUEUE에서 읽은 데이터 구조:
-     * <ul>
-     *   <li>queueId: QUEUE_ID</li>
-     *   <li>mailSource: MAIL_SOURCE (예: OVERDUE_ORDERS)</li>
-     *   <li>alarmName: ALARM_NAME (예: 지연 주문 알림)</li>
-     *   <li>severity: SEVERITY (INFO/WARNING/CRITICAL)</li>
-     *   <li>sqlId: SQL_ID (예: alarm.selectOverdueOrdersDetail)</li>
-     *   <li>sectionTitle: SECTION_TITLE (Procedure가 작성한 소제목)</li>
-     *   <li>sectionContent: SECTION_CONTENT (Procedure가 작성한 본문)</li>
-     * </ul>
+     * QUEUE에서 읽은 데이터 구조:
+     *  - queueId: QUEUE_ID
+     *  - mailSource: MAIL_SOURCE (예: OVERDUE_ORDERS)
+     *  - alarmName: ALARM_NAME (예: 지연 주문 알림)
+     *  - severity: SEVERITY (INFO/WARNING/CRITICAL)
+     *  - sqlId: SQL_ID (예: alarm.selectOverdueOrdersDetail)
+     *  - sectionTitle: SECTION_TITLE (Procedure가 작성한 소제목)
+     *  - sectionContent: SECTION_CONTENT (Procedure가 작성한 본문)
      */
     private void processMessage(Map<String, Object> msg) {
         Long queueId = getLong(msg.get("queueId"));

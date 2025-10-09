@@ -12,14 +12,11 @@ import java.util.stream.Collectors;
 /**
  * 메일 발송 관련 유틸리티
  *
- * <h3>주요 기능</h3>
- * <ul>
- *   <li>이메일 주소 형식 검증</li>
- *   <li>CLOB → String 변환 (H2/Oracle 호환)</li>
- *   <li>수신인 목록 포맷팅</li>
- * </ul>
+ * -이메일 주소 형식 검증
+ * -CLOB → String 변환 (H2/Oracle 호환)
+ * -수신인 목록 포맷팅
  *
- * @author WMS Team
+ * @author 김찬기
  * @since 1.0
  */
 public class MailUtils {

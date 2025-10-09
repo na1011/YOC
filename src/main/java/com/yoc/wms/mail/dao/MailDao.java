@@ -8,7 +8,10 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 메일 DAO (리팩토링)
+ * 메일 DAO
+ *
+ *  @author 김찬기
+ *  @since 1.0
  */
 @Repository
 public class MailDao {

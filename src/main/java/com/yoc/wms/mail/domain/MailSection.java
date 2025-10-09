@@ -6,12 +6,10 @@ import java.util.*;
 
 /**
  * 메일 섹션 도메인
- *
- * 설계:
- * - Factory Pattern을 통해 일관된 섹션 구성 제공
- * - 모든 타입(TABLE, TEXT, HTML, DIVIDER)을 단일 클래스로 표현
- * - type에 따라 사용하는 필드가 다름
  * - 검증은 생성 시 수행
+ *
+ *  @author 김찬기
+ *  @since 1.0
  */
 public class MailSection {
 

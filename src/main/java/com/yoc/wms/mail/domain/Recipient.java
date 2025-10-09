@@ -4,6 +4,9 @@ import java.util.Map;
 
 /**
  * 메일 수신인 정보
+ *
+ *  @author 김찬기
+ *  @since 1.0
  */
 public class Recipient {
 

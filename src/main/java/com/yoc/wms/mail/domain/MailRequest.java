@@ -9,11 +9,8 @@ import java.util.Map;
 /**
  * 메일 발송 요청 DTO
  *
- * 설계 원칙:
- * - 템플릿 의존성 제거
- * - 섹션 기반 메일 발송만 지원
- * - 범용 Builder + Helper Methods 패턴
- * - MailSection 직접 의존성 제거
+ *  @author 김찬기
+ *  @since 1.0
  */
 public class MailRequest {
 

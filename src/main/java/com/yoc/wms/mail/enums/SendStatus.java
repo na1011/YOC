@@ -24,7 +24,7 @@ public enum SendStatus {
 
     public static SendStatus fromCode(String code) {
         if (code == null || code.trim().isEmpty()) {
-            throw new IllegalArgumentException("Send status code cannot be null or empty");
+            throw new IllegalArgumentException("전송상태는 null일 수 없습니다.");
         }
 
         for (SendStatus status : values()) {
@@ -33,6 +33,6 @@ public enum SendStatus {
             }
         }
 
-        throw new IllegalArgumentException("Unknown send status: " + code);
+        throw new IllegalArgumentException("정의되지 않은 전송상태: " + code);
     }
 }

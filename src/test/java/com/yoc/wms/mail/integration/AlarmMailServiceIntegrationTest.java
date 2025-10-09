@@ -22,24 +22,7 @@ import static org.mockito.Mockito.*;
 /**
  * AlarmMailService 통합 테스트 (Mock 기반)
  *
- * <h3>테스트 목표</h3>
- * Producer-Consumer 패턴의 알람 큐 시스템 검증:
- * <ul>
- *   <li>영속성: 발송 실패 시 큐에 상태 보존 (RETRY/FAILED)</li>
- *   <li>재시도 로직: 최대 3회 재시도 후 최종 실패</li>
- *   <li>상태 전이: PENDING → SUCCESS / PENDING → FAILED</li>
- *   <li>SQL_ID 동적 조회: 큐의 SQL_ID로 실제 테이블 데이터 조회</li>
- * </ul>
- *
- * <h3>환경 설정</h3>
- * <ul>
- *   <li>MailService: MockBean (실제 메일 발송 방지)</li>
- *   <li>Producer: alarm-mapper-integration.xml의 insertTestQueue로 시뮬레이션</li>
- *   <li>DB: H2 in-memory (schema-integration.sql, test-data-integration.sql)</li>
- * </ul>
- *
- * <h3>시나리오 구성</h3>
- * 총 10개 시나리오:
+ * - 시나리오 구성
  * 1. 정상 발송 (PENDING → SUCCESS)
  * 2. 복수 알람 배치 처리
  * 3. 첫 번째 재시도 (RETRY_COUNT 증가)

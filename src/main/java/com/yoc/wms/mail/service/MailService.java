@@ -23,26 +23,10 @@ import java.net.InetAddress;
 import java.util.*;
 
 /**
- * 메일 발송 서비스 (단순화됨)
+ * 메일 발송 서비스 (공통화 및 SRP 원칙)
  *
- * <h3>설계 원칙</h3>
- * <ul>
- *   <li>템플릿 의존성 제거 - MailSection 기반으로 통일</li>
- *   <li>단일 책임 - HTML 생성, 발송, 로깅만 수행</li>
- *   <li>Factory Pattern - MailSection.forAlarm() 등 활용</li>
- * </ul>
- *
- * <h3>호출 방법</h3>
- * <pre>
- * // MailRequest 사용
- * MailRequest request = MailRequest.builder()
- *     .subject("제목")
- *     .addAllSections(MailSection.forAlarm(...))
- *     .recipients(recipients)
- *     .mailType("ALARM")
- *     .build();
- * mailService.sendMail(request);
- * </pre>
+ *  @author 김찬기
+ *  @since 1.0
  */
 @Service
 public class MailService {
