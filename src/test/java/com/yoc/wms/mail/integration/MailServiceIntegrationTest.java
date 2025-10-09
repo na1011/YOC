@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @ActiveProfiles("integration")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @Disabled("실제 메일 발송 테스트 - 필요 시 @Disabled 제거 후 실행")
-class MailSendIntegrationTest {
+class MailServiceIntegrationTest {
 
     @Autowired
     private MailService mailService;

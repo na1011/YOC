@@ -14,7 +14,7 @@
 - [ROI 기반 핵심 설계 포인트](#-roi-기반-핵심-설계-포인트)
 - [아키텍처 진화 과정](#-아키텍처-진화-과정)
 - [주요 기능](#-주요-기능)
-- [테스트](#-테스트)
+- [테스트 커버리지](#-테스트-커버리지)
 - [성과 및 기여](#-성과-및-기여)
 
 ---
@@ -480,46 +480,44 @@ SELECT * FROM MAIL_QUEUE WHERE STATUS = 'PENDING';
 
 ---
 
-## 🧪 테스트
-
-### 테스트 커버리지
-
-**181개 테스트, 100% PASS**
-
-```bash
-# 전체 테스트 실행
-./gradlew test
-
-# 패키지별 테스트
-./gradlew test --tests "com.yoc.wms.mail.domain.*Test"       # 67 tests
-./gradlew test --tests "com.yoc.wms.mail.renderer.*Test"     # 26 tests
-./gradlew test --tests "com.yoc.wms.mail.util.*Test"         # 37 tests
-./gradlew test --tests "com.yoc.wms.mail.service.*Test"      # 33 tests
-./gradlew test --tests "com.yoc.wms.mail.integration.*Test"  # 18 tests
-```
+## 🧪 테스트 커버리지
+- **총 181개 테스트, 100% PASS**
 
 ### 단위 테스트 (163개)
+```
+MailSectionTest: 
+- Factory 메서드, 검증 로직, 메타데이터, 심각도 아이콘
 
-- **MailSectionTest**: Factory 메서드, 검증 로직, 메타데이터, 심각도 아이콘
-- **MailRequestTest**: Builder + Helper 메서드 패턴, Subject 생성, 검증
-- **RecipientTest**: Builder, fromMap 변환, 엣지케이스
-- **MailBodyRendererTest**: SectionType별 렌더링, HTML 이스케이프
-- **MailUtilsTest**: 이메일 검증, CLOB 변환, 수신인 검증
-- **MailServiceTest**: 발송 흐름, 재시도 로직, 로그 생성
-- **AlarmMailServiceTest**: 큐 처리, 실패 핸들링, 타입 변환
+MailRequestTest: 
+- Builder + Helper 메서드 패턴, Subject 생성, 검증
 
+RecipientTest: 
+- Builder, fromMap 변환, 엣지케이스
+
+MailBodyRendererTest: 
+- SectionType별 렌더링, HTML 이스케이프
+
+MailUtilsTest: 
+- 이메일 검증, CLOB 변환, 수신인 검증
+
+MailServiceTest: 
+- 발송 흐름, 재시도 로직, 로그 생성
+
+AlarmMailServiceTest: 
+- 큐 처리, 실패 핸들링, 타입 변환
+```
 ### 통합 테스트 (18개)
-
-#### MailSendIntegrationTest (7개)
+```
+MailServiceIntegrationTest (7개)
 - 실제 메일 발송, DB 연동, 로그 검증
 
-#### AlarmMailServiceIntegrationTest (11개)
+AlarmMailServiceIntegrationTest (11개)
 - Producer-Consumer 패턴 시뮬레이션
 - 큐 상태 전이 검증 (PENDING → SUCCESS/FAILED)
 - 재시도 메커니즘 검증
 - SQL_ID 동적 쿼리 검증
 
-**테스트 시나리오**:
+통합 테스트 시나리오:
 1. 정상 발송 (PENDING → SUCCESS)
 2. 복수 알람 배치 처리 (3건 동시)
 3. 첫 번째 재시도 (RETRY_COUNT 증가)
@@ -531,6 +529,7 @@ SELECT * FROM MAIL_QUEUE WHERE STATUS = 'PENDING';
 9. CLOB 변환 검증
 10. 심각도별 처리 (CRITICAL/WARNING/INFO)
 11. 통합 검증 (전체 큐 상태 종합)
+```
 
 ---
 
