@@ -411,38 +411,6 @@ MailRequest.builder()
 
 ---
 
-## ⚙️ 설치 및 설정
-
-### 1. 프로젝트 클론
-
-```bash
-git clone <repository-url>
-cd yoc
-```
-
-### 2. 설정 파일 준비
-
-템플릿 파일을 복사하여 실제 설정 파일을 생성합니다:
-
-```bash
-# Application properties
-cp src/main/resources/application.properties.template src/main/resources/application.properties
-
-# Data SQL (선택사항 - 테스트 데이터 커스터마이징 시)
-cp src/main/resources/data.sql.template src/main/resources/data.sql
-```
-
-### 3. Gmail SMTP 설정
-
-`src/main/resources/application.properties` 파일을 열어 Gmail 계정 정보를 입력합니다:
-
-```properties
-spring.mail.username=YOUR_EMAIL@gmail.com
-spring.mail.password=YOUR_APP_PASSWORD
-```
-
----
-
 ## 🛠 기술 스택
 
 ### Backend
