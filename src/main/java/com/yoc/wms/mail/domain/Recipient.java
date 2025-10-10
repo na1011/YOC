@@ -1,7 +1,7 @@
 package com.yoc.wms.mail.domain;
 
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * 메일 수신인 정보
@@ -37,6 +37,25 @@ public class Recipient {
         }
 
         return new Recipient(userId, email, group);
+    }
+
+    /**
+     * Map 리스트를 Recipient 리스트로 변환 (중복 제거 포함)
+     *
+     * @param maps MyBatis 조회 결과 (List<Map<String, Object>>)
+     * @return 중복 제거된 Recipient 리스트 (이메일 기준, 순서 보장)
+     */
+    public static List<Recipient> fromMapList(List<Map<String, Object>> maps) {
+        if (maps == null || maps.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        // LinkedHashSet으로 중복 제거 (이메일 기준, 순서 보장)
+        Set<Recipient> recipientSet = maps.stream()
+                .map(Recipient::fromMap)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+
+        return new ArrayList<>(recipientSet);
     }
 
     public static Builder builder() {

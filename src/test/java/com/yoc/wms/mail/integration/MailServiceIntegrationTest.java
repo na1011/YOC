@@ -51,7 +51,7 @@ class MailServiceIntegrationTest {
             .build());
         testRecipients.add(Recipient.builder()
             .userId("USER")
-            .email("zerus94@naver.com")
+            .email("seongbin_heo@youngone.co.kr")
             .group("USER")
             .build());
 
@@ -115,37 +115,37 @@ class MailServiceIntegrationTest {
         List<Map<String, String>> tableData = new ArrayList<>();
 
         Map<String, String> row1 = new LinkedHashMap<>();
-        row1.put("항목", "CPU 사용률");
-        row1.put("현재값", "85%");
-        row1.put("기준값", "80%");
-        row1.put("상태", "경고");
+        row1.put("주문번호", "251010001");
+        row1.put("주문수량", "10");
+        row1.put("확정수량", "8");
+        row1.put("센터분할", "예");
         tableData.add(row1);
 
         Map<String, String> row2 = new LinkedHashMap<>();
-        row2.put("항목", "메모리 사용률");
-        row2.put("현재값", "72%");
-        row2.put("기준값", "80%");
-        row2.put("상태", "정상");
+        row2.put("주문번호", "251010005");
+        row2.put("주문수량", "3");
+        row2.put("확정수량", "1");
+        row2.put("센터분할", "아니오");
         tableData.add(row2);
 
         Map<String, String> row3 = new LinkedHashMap<>();
-        row3.put("항목", "디스크 사용률");
-        row3.put("현재값", "65%");
-        row3.put("기준값", "80%");
-        row3.put("상태", "정상");
+        row3.put("주문번호", "251010009");
+        row3.put("주문수량", "8");
+        row3.put("확정수량", "2");
+        row3.put("센터분할", "예");
         tableData.add(row3);
 
         // 범용 Builder로 복수 섹션 구성 (MailSection 의존성 제거)
         MailRequest request = MailRequest.builder()
-            .subject("[통합테스트] 복수 섹션 메일")
-            .addTextSection("📊 시스템 리소스 모니터링",
-                "현재 시스템 리소스 상태를 보고합니다.\n\n" +
-                "CPU 사용률이 기준치를 초과했습니다.")
+            .subject("[통합테스트] B2C 주문 분할 확정 안내")
+            .addTextSection("📊 테스트용 자료 입니다.",
+                "테스트용 자료 입니다.\n\n" +
+                "ADM 사용자에게만 발송되는 메일입니다.")
             .addTableSection(tableData)
             .addDivider()
             .addTextSection("📌 조치 사항",
-                "CPU 사용률이 높습니다. 불필요한 프로세스를 종료하거나\n" +
-                "서버 리소스 증설을 검토해 주시기 바랍니다.")
+                "테스트용 메일 입니다.\n" +
+                "해당 주문번호에 대한 출고 작업을 우선해 주시기 바랍니다.")
             .recipients(testRecipients)
             .mailType("DIRECT")
             .build();

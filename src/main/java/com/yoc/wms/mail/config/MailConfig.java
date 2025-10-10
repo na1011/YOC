@@ -17,10 +17,10 @@ public class MailConfig {
     private static final String CONTACT1_EMAIL = "chanki_kim@youngone.co.kr";
 
     private static final String CONTACT2_NAME = "최승협";
-    private static final String CONTACT2_EMAIL = "seunghyub@youngone.co.kr";
+    private static final String CONTACT2_EMAIL = "test1@test.co.kr";
 
     private static final String CONTACT3_NAME = "허성빈";
-    private static final String CONTACT3_EMAIL = "seongbin_heo@youngone.co.kr";
+    private static final String CONTACT3_EMAIL = "test2@test.co.kr";
 
     // ========== 폰트 설정 ==========
     @Value("${mail.style.font.family:Arial, sans-serif}")

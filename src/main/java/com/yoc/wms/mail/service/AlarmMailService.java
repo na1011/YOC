@@ -205,13 +205,8 @@ public class AlarmMailService {
         // 4. 통합 쿼리 호출 (DISTINCT + IN 절)
         List<Map<String, Object>> recipientMaps = mailDao.selectList("alarm.selectRecipientsByConditions", params);
 
-        // 5. Recipient 변환 및 이메일 기준 중복 제거
-        Set<Recipient> recipientSet = new LinkedHashSet<>();  // 순서 보장 + 중복 제거
-        recipientMaps.stream()
-                .map(Recipient::fromMap)
-                .forEach(recipientSet::add);
-
-        List<Recipient> recipients = new ArrayList<>(recipientSet);
+        // 5. Recipient 변환 및 이메일 기준 중복 제거 (fromMapList 사용)
+        List<Recipient> recipients = Recipient.fromMapList(recipientMaps);
 
         // 6. 유효성 검증
         if (recipients.isEmpty()) {

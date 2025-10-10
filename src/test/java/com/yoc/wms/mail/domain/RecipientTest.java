@@ -3,8 +3,7 @@ package com.yoc.wms.mail.domain;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -255,5 +254,213 @@ class RecipientTest {
         assertEquals(longStringUpper, recipient.getUserId());
         assertTrue(recipient.getEmail().startsWith(longString));
         assertEquals(longString, recipient.getGroup());  // group은 그대로 유지
+    }
+
+    // ==================== fromMapList() 테스트 ====================
+
+    @Test
+    @DisplayName("fromMapList: 정상 변환 - 복수 Map")
+    void fromMapList_multipleMaps() {
+        // Given
+        List<Map<String, Object>> maps = new ArrayList<>();
+
+        Map<String, Object> map1 = new HashMap<>();
+        map1.put("userId", "admin");
+        map1.put("email", "admin@company.com");
+        map1.put("group", "ADM");
+        maps.add(map1);
+
+        Map<String, Object> map2 = new HashMap<>();
+        map2.put("userId", "user1");
+        map2.put("email", "user1@company.com");
+        map2.put("group", "USER");
+        maps.add(map2);
+
+        Map<String, Object> map3 = new HashMap<>();
+        map3.put("userId", "user2");
+        map3.put("email", "user2@company.com");
+        map3.put("group", "USER");
+        maps.add(map3);
+
+        // When
+        List<Recipient> recipients = Recipient.fromMapList(maps);
+
+        // Then
+        assertEquals(3, recipients.size());
+        assertEquals("ADMIN", recipients.get(0).getUserId());  // 대문자 정규화
+        assertEquals("admin@company.com", recipients.get(0).getEmail());
+        assertEquals("USER1", recipients.get(1).getUserId());  // 대문자 정규화
+        assertEquals("user1@company.com", recipients.get(1).getEmail());
+        assertEquals("USER2", recipients.get(2).getUserId());  // 대문자 정규화
+        assertEquals("user2@company.com", recipients.get(2).getEmail());
+    }
+
+    @Test
+    @DisplayName("fromMapList: 빈 리스트")
+    void fromMapList_emptyList() {
+        // Given
+        List<Map<String, Object>> maps = new ArrayList<>();
+
+        // When
+        List<Recipient> recipients = Recipient.fromMapList(maps);
+
+        // Then
+        assertNotNull(recipients);
+        assertTrue(recipients.isEmpty());
+    }
+
+    @Test
+    @DisplayName("fromMapList: null 리스트")
+    void fromMapList_nullList() {
+        // When
+        List<Recipient> recipients = Recipient.fromMapList(null);
+
+        // Then
+        assertNotNull(recipients);
+        assertTrue(recipients.isEmpty());
+    }
+
+    @Test
+    @DisplayName("fromMapList: 중복 이메일 제거")
+    void fromMapList_duplicateEmails() {
+        // Given - 동일한 이메일을 가진 다른 사용자
+        List<Map<String, Object>> maps = new ArrayList<>();
+
+        Map<String, Object> map1 = new HashMap<>();
+        map1.put("userId", "admin1");
+        map1.put("email", "admin@company.com");
+        map1.put("group", "ADM");
+        maps.add(map1);
+
+        Map<String, Object> map2 = new HashMap<>();
+        map2.put("userId", "admin2");
+        map2.put("email", "admin@company.com");  // 동일한 이메일 (중복)
+        map2.put("group", "ADM");
+        maps.add(map2);
+
+        Map<String, Object> map3 = new HashMap<>();
+        map3.put("userId", "user1");
+        map3.put("email", "user@company.com");
+        map3.put("group", "USER");
+        maps.add(map3);
+
+        // When
+        List<Recipient> recipients = Recipient.fromMapList(maps);
+
+        // Then - 중복된 이메일은 제거되어 2명만 반환
+        assertEquals(2, recipients.size());
+        assertEquals("admin@company.com", recipients.get(0).getEmail());
+        assertEquals("user@company.com", recipients.get(1).getEmail());
+    }
+
+    @Test
+    @DisplayName("fromMapList: 대소문자 혼용 이메일 중복 제거")
+    void fromMapList_caseInsensitiveEmailDuplicates() {
+        // Given - 대소문자만 다른 이메일
+        List<Map<String, Object>> maps = new ArrayList<>();
+
+        Map<String, Object> map1 = new HashMap<>();
+        map1.put("userId", "admin1");
+        map1.put("email", "Admin@Company.com");  // 대문자 포함
+        map1.put("group", "ADM");
+        maps.add(map1);
+
+        Map<String, Object> map2 = new HashMap<>();
+        map2.put("userId", "admin2");
+        map2.put("email", "admin@company.com");  // 소문자 (동일 이메일)
+        map2.put("group", "ADM");
+        maps.add(map2);
+
+        // When
+        List<Recipient> recipients = Recipient.fromMapList(maps);
+
+        // Then - 이메일 소문자 정규화로 중복 제거되어 1명만 반환
+        assertEquals(1, recipients.size());
+        assertEquals("admin@company.com", recipients.get(0).getEmail());  // 소문자로 정규화
+    }
+
+    @Test
+    @DisplayName("fromMapList: 대소문자 혼용 USER_ID 정규화")
+    void fromMapList_userIdCaseNormalization() {
+        // Given
+        List<Map<String, Object>> maps = new ArrayList<>();
+
+        Map<String, Object> map1 = new HashMap<>();
+        map1.put("userId", "admin");  // 소문자
+        map1.put("email", "admin@company.com");
+        map1.put("group", "ADM");
+        maps.add(map1);
+
+        Map<String, Object> map2 = new HashMap<>();
+        map2.put("userId", "UsEr1");  // 혼용
+        map2.put("email", "user1@company.com");
+        map2.put("group", "USER");
+        maps.add(map2);
+
+        // When
+        List<Recipient> recipients = Recipient.fromMapList(maps);
+
+        // Then - USER_ID는 대문자로 정규화
+        assertEquals(2, recipients.size());
+        assertEquals("ADMIN", recipients.get(0).getUserId());
+        assertEquals("USER1", recipients.get(1).getUserId());
+    }
+
+    @Test
+    @DisplayName("fromMapList: 순서 보장 (LinkedHashSet)")
+    void fromMapList_orderPreserved() {
+        // Given - 순서가 중요한 리스트
+        List<Map<String, Object>> maps = new ArrayList<>();
+
+        Map<String, Object> map1 = new HashMap<>();
+        map1.put("userId", "user1");
+        map1.put("email", "user1@company.com");
+        maps.add(map1);
+
+        Map<String, Object> map2 = new HashMap<>();
+        map2.put("userId", "user2");
+        map2.put("email", "user2@company.com");
+        maps.add(map2);
+
+        Map<String, Object> map3 = new HashMap<>();
+        map3.put("userId", "user3");
+        map3.put("email", "user3@company.com");
+        maps.add(map3);
+
+        // When
+        List<Recipient> recipients = Recipient.fromMapList(maps);
+
+        // Then - 삽입 순서 유지
+        assertEquals("USER1", recipients.get(0).getUserId());
+        assertEquals("USER2", recipients.get(1).getUserId());
+        assertEquals("USER3", recipients.get(2).getUserId());
+    }
+
+    @Test
+    @DisplayName("fromMapList: Map 내부 필드 누락 처리")
+    void fromMapList_missingFields() {
+        // Given - 일부 필드가 누락된 Map
+        List<Map<String, Object>> maps = new ArrayList<>();
+
+        Map<String, Object> map1 = new HashMap<>();
+        map1.put("userId", "admin");
+        map1.put("email", "admin@company.com");
+        // group 없음
+        maps.add(map1);
+
+        Map<String, Object> map2 = new HashMap<>();
+        map2.put("email", "user@company.com");
+        // userId, group 없음
+        maps.add(map2);
+
+        // When
+        List<Recipient> recipients = Recipient.fromMapList(maps);
+
+        // Then
+        assertEquals(2, recipients.size());
+        assertEquals("ADMIN", recipients.get(0).getUserId());
+        assertNull(recipients.get(0).getGroup());
+        assertNull(recipients.get(1).getUserId());
+        assertEquals("user@company.com", recipients.get(1).getEmail());
     }
 }

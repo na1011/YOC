@@ -4,7 +4,7 @@
 [![Java](https://img.shields.io/badge/Java-17%20%7C%208-orange)](https://www.oracle.com/java/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.x-brightgreen)](https://spring.io/projects/spring-boot)
 [![MyBatis](https://img.shields.io/badge/MyBatis-3.x-blue)](https://mybatis.org/mybatis-3/)
-[![Test Coverage](https://img.shields.io/badge/Tests-197%20passed-success)](https://github.com)
+[![Test Coverage](https://img.shields.io/badge/Tests-205%20passed-success)](https://github.com)
 
 ---
 
@@ -509,9 +509,9 @@ SELECT * FROM MAIL_QUEUE WHERE STATUS = 'PENDING';
 ---
 
 ## 🧪 테스트 커버리지
-- **총 197개 테스트, 100% PASS**
+- **총 205개 테스트, 100% PASS**
 
-### 단위 테스트 (185개)
+### 단위 테스트 (193개)
 ```
 MailSectionTest: 
 - Factory 메서드, 검증 로직, 메타데이터, 심각도 아이콘
@@ -519,8 +519,8 @@ MailSectionTest:
 MailRequestTest: 
 - Builder + Helper 메서드 패턴, Subject 생성, 검증
 
-RecipientTest (14개):
-- Builder 패턴, fromMap 변환, 대소문자 정규화, 중복 제거, 엣지케이스
+RecipientTest (22개):
+- Builder 패턴, fromMap 변환, fromMapList 변환, 대소문자 정규화, 중복 제거, 엣지케이스
 
 MailBodyRendererTest:
 - SectionType별 렌더링, HTML 이스케이프
