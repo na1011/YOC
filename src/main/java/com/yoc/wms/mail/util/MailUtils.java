@@ -70,14 +70,29 @@ public class MailUtils {
     }
 
     /**
-     * CLOB을 String으로 변환
-     * - String: 그대로 반환
-     * - java.sql.Clob: getSubString() 사용
-     * - null: 빈 문자열 반환
-     * - 기타: toString() 호출
+     * CLOB을 String으로 변환 (H2/Oracle 호환성)
      *
-     * @param obj 변환할 객체
-     * @return 변환된 문자열
+     * H2와 Oracle은 CLOB 반환 타입이 다릅니다:
+     * - H2: org.h2.jdbc.JdbcClob
+     * - Oracle: String 또는 oracle.sql.CLOB
+     *
+     * 직접 캐스팅 금지:
+     *   ❌ String content = (String) msg.get("sectionContent");  // Oracle: OK, H2: ClassCastException
+     *   ✅ String content = MailUtils.convertToString(msg.get("sectionContent"));  // 양쪽 OK
+     *
+     * Conversion Rules:
+     * - String: 그대로 반환 (Oracle 일반 케이스)
+     * - java.sql.Clob: getSubString() 사용 (H2, Oracle CLOB)
+     * - null: 빈 문자열 반환 (null-safe)
+     * - 기타: toString() 호출 (fallback)
+     *
+     * Usage:
+     *   Map<String, Object> msg = mailDao.selectOne("alarm.selectQueue", params);
+     *   String sectionContent = MailUtils.convertToString(msg.get("sectionContent"));
+     *   String recipientUserIds = MailUtils.convertToString(msg.get("recipientUserIds"));
+     *
+     * @param obj 변환할 객체 (Map value from MyBatis)
+     * @return 변환된 문자열 (null → 빈 문자열)
      * @throws ValueChainException CLOB 변환 실패 시
      */
     public static String convertToString(Object obj) {

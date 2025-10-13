@@ -1,26 +1,34 @@
 package com.yoc.wms.mail.config;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.PropertySource;
 import org.springframework.stereotype.Component;
 
 /**
  * 메일 스타일 통합 설정
- * properties 파일에서 값 로드
+ * mail-config.properties 파일에서 값 로드
  *
  *  @author 김찬기
  *  @since 1.0
  */
 @Component
+@PropertySource("classpath:mail-config.properties")
 public class MailConfig {
     // ==================== 연락처 정보 ====================
-    private static final String CONTACT1_NAME = "김찬기";
-    private static final String CONTACT1_EMAIL = "chanki_kim@youngone.co.kr";
+    @Value("${mail.contact.name.1:IT}")
+    private String contactName1;
+    @Value("${mail.contact.email.1:C20002_3000@test.co.kr}")
+    private String contactEmail1;
 
-    private static final String CONTACT2_NAME = "최승협";
-    private static final String CONTACT2_EMAIL = "test1@test.co.kr";
+    @Value("${mail.contact.name.2:#{null}}")
+    private String contactName2;
+    @Value("${mail.contact.email.2:#{null}}")
+    private String contactEmail2;
 
-    private static final String CONTACT3_NAME = "허성빈";
-    private static final String CONTACT3_EMAIL = "test2@test.co.kr";
+    @Value("${mail.contact.name.3:#{null}}")
+    private String contactName3;
+    @Value("${mail.contact.email.3:#{null}}")
+    private String contactEmail3;
 
     // ========== 폰트 설정 ==========
     @Value("${mail.style.font.family:Arial, sans-serif}")
@@ -118,11 +126,23 @@ public class MailConfig {
 
     /**
      * 연락처 정보 반환 (HTML 형식)
+     *
+     * contact1은 기본값 보장, contact2~3는 null/빈값이면 건너뜀
      */
     public String getContactInfo() {
-        return CONTACT1_NAME + ": " + CONTACT1_EMAIL + "\n" +
-                CONTACT2_NAME + ": " + CONTACT2_EMAIL + "\n" +
-                CONTACT3_NAME + ": " + CONTACT3_EMAIL;
+        StringBuilder contactInfo = new StringBuilder();
+        contactInfo.append(contactName1 + ": " + contactEmail1);
+
+        if (contactName2 != null && !contactName2.isEmpty() && contactEmail2 != null && !contactEmail2.isEmpty()) {
+            contactInfo.append("\n");
+            contactInfo.append(contactName2 + ": " + contactEmail2);
+        }
+        if (contactName3 != null && !contactName3.isEmpty() && contactEmail3 != null && !contactEmail3.isEmpty()) {
+            contactInfo.append("\n");
+            contactInfo.append(contactName3 + ": " + contactEmail3);
+        }
+
+        return contactInfo.toString();
     }
 
     // ========== 복합 스타일 빌더 ==========

@@ -2,6 +2,7 @@ package com.yoc.wms.mail.renderer;
 
 import com.yoc.wms.mail.config.MailConfig;
 import com.yoc.wms.mail.domain.MailSection;
+import com.yoc.wms.mail.exception.ValueChainException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -81,7 +82,7 @@ public class MailBodyRenderer {
             case DIVIDER:
                 return renderDivider(section);
             default:
-                throw new IllegalArgumentException("Unknown section type: " + section.getType());
+                throw new ValueChainException("Unknown section type: " + section.getType());
         }
     }
 

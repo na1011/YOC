@@ -1,6 +1,7 @@
 package com.yoc.wms.mail.domain;
 
 import com.yoc.wms.mail.enums.SectionType;
+import com.yoc.wms.mail.exception.ValueChainException;
 
 import java.util.*;
 
@@ -34,22 +35,22 @@ public class MailSection {
      */
     private void validate() {
         if (type == null) {
-            throw new IllegalArgumentException("Section type is required");
+            throw new ValueChainException("Section type is required");
         }
 
         switch (type) {
             case TABLE:
                 if (data == null || data.isEmpty()) {
-                    throw new IllegalArgumentException("TABLE type requires data");
+                    throw new ValueChainException("TABLE type requires data");
                 }
                 break;
             case TEXT:
             case HTML:
                 if (content == null || content.trim().isEmpty()) {
-                    throw new IllegalArgumentException(type + " type requires content");
+                    throw new ValueChainException(type + " type requires content");
                 }
                 if (type == SectionType.HTML && containsUnsafeHtml(content)) {
-                    throw new IllegalArgumentException("HTML content contains unsafe elements");
+                    throw new ValueChainException("HTML content contains unsafe elements");
                 }
                 break;
             case DIVIDER:

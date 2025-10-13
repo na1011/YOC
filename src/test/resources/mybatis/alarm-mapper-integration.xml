@@ -9,7 +9,7 @@
     <!-- ==================== 큐 관리 (main과 동일) ==================== -->
 
     <!-- 큐 조회 (PENDING 상태) -->
-    <select id="selectPendingQueue" resultType="map">
+    <select id="selectPendingQueue" parameterType="map" resultType="map">
         SELECT QUEUE_ID            AS queueId,
                MAIL_SOURCE         AS mailSource,
                ALARM_NAME          AS alarmName,
@@ -25,8 +25,8 @@
                REG_DATE            AS regDate
         FROM MAIL_QUEUE
         WHERE STATUS = 'PENDING'
-        ORDER BY REG_DATE ASC
-            FETCH FIRST 10 ROWS ONLY
+        ORDER BY REG_DATE ASC<if test="limit != null">
+        FETCH FIRST ${limit} ROWS ONLY</if>
     </select>
 
     <!-- 큐 상태 업데이트: SUCCESS -->

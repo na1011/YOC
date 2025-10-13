@@ -1,6 +1,7 @@
 package com.yoc.wms.mail.domain;
 
 import com.yoc.wms.mail.enums.SectionType;
+import com.yoc.wms.mail.exception.ValueChainException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -160,7 +161,7 @@ class MailSectionTest {
     @DisplayName("검증 실패: type이 null")
     void validation_nullType() {
         // When & Then
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+        ValueChainException ex = assertThrows(ValueChainException.class, () ->
             MailSection.builder().content("내용").build()
         );
         assertTrue(ex.getMessage().contains("type is required"));
@@ -170,7 +171,7 @@ class MailSectionTest {
     @DisplayName("검증 실패: TABLE 타입에 data가 null")
     void validation_tableWithoutData() {
         // When & Then
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+        ValueChainException ex = assertThrows(ValueChainException.class, () ->
             MailSection.builder().type(SectionType.TABLE).build()
         );
         assertTrue(ex.getMessage().contains("TABLE type requires data"));
@@ -180,7 +181,7 @@ class MailSectionTest {
     @DisplayName("검증 실패: TABLE 타입에 빈 data")
     void validation_tableWithEmptyData() {
         // When & Then
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+        ValueChainException ex = assertThrows(ValueChainException.class, () ->
             MailSection.builder()
                 .type(SectionType.TABLE)
                 .data(Collections.emptyList())
@@ -193,7 +194,7 @@ class MailSectionTest {
     @DisplayName("검증 실패: TEXT 타입에 content가 null")
     void validation_textWithoutContent() {
         // When & Then
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+        ValueChainException ex = assertThrows(ValueChainException.class, () ->
             MailSection.builder().type(SectionType.TEXT).build()
         );
         assertTrue(ex.getMessage().contains("TEXT type requires content"));
@@ -203,7 +204,7 @@ class MailSectionTest {
     @DisplayName("검증 실패: TEXT 타입에 공백 content")
     void validation_textWithBlankContent() {
         // When & Then
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+        ValueChainException ex = assertThrows(ValueChainException.class, () ->
             MailSection.builder()
                 .type(SectionType.TEXT)
                 .content("   ")
@@ -216,7 +217,7 @@ class MailSectionTest {
     @DisplayName("검증 실패: HTML 타입에 <script> 태그 포함")
     void validation_htmlWithScriptTag() {
         // When & Then
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+        ValueChainException ex = assertThrows(ValueChainException.class, () ->
             MailSection.builder()
                 .type(SectionType.HTML)
                 .content("<p>Hello</p><script>alert('xss')</script>")
@@ -229,7 +230,7 @@ class MailSectionTest {
     @DisplayName("검증 실패: HTML 타입에 javascript: 포함")
     void validation_htmlWithJavascriptProtocol() {
         // When & Then
-        assertThrows(IllegalArgumentException.class, () ->
+        assertThrows(ValueChainException.class, () ->
             MailSection.builder()
                 .type(SectionType.HTML)
                 .content("<a href='javascript:void(0)'>Click</a>")
@@ -241,7 +242,7 @@ class MailSectionTest {
     @DisplayName("검증 실패: HTML 타입에 onerror 이벤트")
     void validation_htmlWithOnError() {
         // When & Then
-        assertThrows(IllegalArgumentException.class, () ->
+        assertThrows(ValueChainException.class, () ->
             MailSection.builder()
                 .type(SectionType.HTML)
                 .content("<img src='x' onerror='alert(1)'>")

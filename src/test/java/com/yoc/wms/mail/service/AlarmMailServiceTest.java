@@ -68,6 +68,8 @@ class AlarmMailServiceTest {
             createMap("orderId", "002", "status", "DELAYED")
         );
 
+        // 기본 동작: 메일 발송 성공 (실패 케이스는 개별 테스트에서 override)
+        lenient().when(mailService.sendMail(any(MailRequest.class))).thenReturn(true);
     }
 
     // ==================== processQueue() 테스트 ====================
@@ -76,7 +78,7 @@ class AlarmMailServiceTest {
     @DisplayName("processQueue: 정상 처리")
     void processQueue_success() {
         // Given
-        when(mailDao.selectList("alarm.selectPendingQueue", null))
+        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
             .thenReturn(Collections.singletonList(testQueueMessage));
         when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
             .thenReturn(testTableData);
@@ -87,7 +89,7 @@ class AlarmMailServiceTest {
         alarmMailService.processQueue();
 
         // Then
-        verify(mailDao).selectList("alarm.selectPendingQueue", null);
+        verify(mailDao).selectList(eq("alarm.selectPendingQueue"), anyMap());
         verify(mailDao).selectList("alarm.selectOverdueOrdersDetail", null);
         verify(mailDao).selectList(eq("alarm.selectRecipientsByConditions"), anyMap());
         verify(mailService).sendMail(any(MailRequest.class));
@@ -98,14 +100,14 @@ class AlarmMailServiceTest {
     @DisplayName("processQueue: 빈 큐 - 아무 작업 안 함")
     void processQueue_emptyQueue() {
         // Given
-        when(mailDao.selectList("alarm.selectPendingQueue", null))
+        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
             .thenReturn(Collections.emptyList());
 
         // When
         alarmMailService.processQueue();
 
         // Then
-        verify(mailDao).selectList("alarm.selectPendingQueue", null);
+        verify(mailDao).selectList(eq("alarm.selectPendingQueue"), anyMap());
         verify(mailService, never()).sendMail(any());
     }
 
@@ -113,14 +115,14 @@ class AlarmMailServiceTest {
     @DisplayName("processQueue: null 큐 - 아무 작업 안 함")
     void processQueue_nullQueue() {
         // Given
-        when(mailDao.selectList("alarm.selectPendingQueue", null))
+        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
             .thenReturn(null);
 
         // When
         alarmMailService.processQueue();
 
         // Then
-        verify(mailDao).selectList("alarm.selectPendingQueue", null);
+        verify(mailDao).selectList(eq("alarm.selectPendingQueue"), anyMap());
         verify(mailService, never()).sendMail(any());
     }
 
@@ -136,7 +138,7 @@ class AlarmMailServiceTest {
         msg2.put("queueId", 2L);
         msg2.put("mailSource", "SOURCE2");
 
-        when(mailDao.selectList("alarm.selectPendingQueue", null))
+        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
             .thenReturn(Arrays.asList(msg1, msg2));
         when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
             .thenReturn(testTableData);
@@ -163,7 +165,7 @@ class AlarmMailServiceTest {
 
         testQueueMessage.put("sectionContent", clob);
 
-        when(mailDao.selectList("alarm.selectPendingQueue", null))
+        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
             .thenReturn(Collections.singletonList(testQueueMessage));
         when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
             .thenReturn(testTableData);
@@ -182,7 +184,7 @@ class AlarmMailServiceTest {
     @DisplayName("processMessage: 테이블 데이터 없음 - 발송 성공")
     void processMessage_noTableData() {
         // Given
-        when(mailDao.selectList("alarm.selectPendingQueue", null))
+        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
             .thenReturn(Collections.singletonList(testQueueMessage));
         when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
             .thenReturn(Collections.emptyList());
@@ -200,7 +202,7 @@ class AlarmMailServiceTest {
     @DisplayName("processMessage: ADM 사용자 없음 - 예외 발생")
     void processMessage_noAdmUsers() {
         // Given
-        when(mailDao.selectList("alarm.selectPendingQueue", null))
+        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
             .thenReturn(Collections.singletonList(testQueueMessage));
         when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
             .thenReturn(testTableData);
@@ -219,7 +221,7 @@ class AlarmMailServiceTest {
     @DisplayName("processMessage: ADM 사용자 null - 예외 발생")
     void processMessage_admUsersNull() {
         // Given
-        when(mailDao.selectList("alarm.selectPendingQueue", null))
+        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
             .thenReturn(Collections.singletonList(testQueueMessage));
         when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
             .thenReturn(testTableData);
@@ -239,13 +241,13 @@ class AlarmMailServiceTest {
     @DisplayName("handleFailure: 첫 실패 - 재시도 상태")
     void handleFailure_firstFailure() {
         // Given
-        when(mailDao.selectList("alarm.selectPendingQueue", null))
+        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
             .thenReturn(Collections.singletonList(testQueueMessage));
         when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
             .thenReturn(testTableData);
         when(mailDao.selectList(eq("alarm.selectRecipientsByConditions"), anyMap()))
             .thenReturn(testAdmUsers);
-        doThrow(new RuntimeException("발송 실패"))
+        doReturn(false)
             .when(mailService).sendMail(any(MailRequest.class));
 
         // When
@@ -265,13 +267,13 @@ class AlarmMailServiceTest {
         // Given - retryCount가 2 (3번째 시도)
         testQueueMessage.put("retryCount", 2);
 
-        when(mailDao.selectList("alarm.selectPendingQueue", null))
+        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
             .thenReturn(Collections.singletonList(testQueueMessage));
         when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
             .thenReturn(testTableData);
         when(mailDao.selectList(eq("alarm.selectRecipientsByConditions"), anyMap()))
             .thenReturn(testAdmUsers);
-        doThrow(new RuntimeException("발송 실패"))
+        doReturn(false)
             .when(mailService).sendMail(any(MailRequest.class));
 
         // When
@@ -285,14 +287,13 @@ class AlarmMailServiceTest {
     @DisplayName("handleFailure: 매우 긴 에러 메시지 - 2000자로 자름")
     void handleFailure_longErrorMessage() {
         // Given
-        String longError = "E".repeat(5000);
-        when(mailDao.selectList("alarm.selectPendingQueue", null))
+        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
             .thenReturn(Collections.singletonList(testQueueMessage));
         when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
             .thenReturn(testTableData);
         when(mailDao.selectList(eq("alarm.selectRecipientsByConditions"), anyMap()))
             .thenReturn(testAdmUsers);
-        doThrow(new RuntimeException(longError))
+        doReturn(false)
             .when(mailService).sendMail(any(MailRequest.class));
 
         // When
@@ -314,7 +315,7 @@ class AlarmMailServiceTest {
         // Given
         testQueueMessage.put("severity", "CRITICAL");
 
-        when(mailDao.selectList("alarm.selectPendingQueue", null))
+        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
             .thenReturn(Collections.singletonList(testQueueMessage));
         when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
             .thenReturn(testTableData);
@@ -336,7 +337,7 @@ class AlarmMailServiceTest {
         // Given
         testQueueMessage.put("severity", "INFO");
 
-        when(mailDao.selectList("alarm.selectPendingQueue", null))
+        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
             .thenReturn(Collections.singletonList(testQueueMessage));
         when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
             .thenReturn(testTableData);
@@ -358,7 +359,7 @@ class AlarmMailServiceTest {
         // Given
         testQueueMessage.put("queueId", 123L);
 
-        when(mailDao.selectList("alarm.selectPendingQueue", null))
+        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
             .thenReturn(Collections.singletonList(testQueueMessage));
         when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
             .thenReturn(testTableData);
@@ -380,7 +381,7 @@ class AlarmMailServiceTest {
         // Given
         testQueueMessage.put("queueId", 456);
 
-        when(mailDao.selectList("alarm.selectPendingQueue", null))
+        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
             .thenReturn(Collections.singletonList(testQueueMessage));
         when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
             .thenReturn(testTableData);
@@ -402,7 +403,7 @@ class AlarmMailServiceTest {
             createMap("id", 123, "active", true, "name", "Test")
         );
 
-        when(mailDao.selectList("alarm.selectPendingQueue", null))
+        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
             .thenReturn(Collections.singletonList(testQueueMessage));
         when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
             .thenReturn(testTableData);
@@ -424,7 +425,7 @@ class AlarmMailServiceTest {
         // Given
         testQueueMessage.put("sqlId", null);
 
-        when(mailDao.selectList("alarm.selectPendingQueue", null))
+        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
             .thenReturn(Collections.singletonList(testQueueMessage));
 
         // When
@@ -440,7 +441,7 @@ class AlarmMailServiceTest {
         // Given
         testQueueMessage.put("sectionTitle", null);
 
-        when(mailDao.selectList("alarm.selectPendingQueue", null))
+        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
             .thenReturn(Collections.singletonList(testQueueMessage));
         when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
             .thenReturn(testTableData);
@@ -460,13 +461,13 @@ class AlarmMailServiceTest {
         // Given
         testQueueMessage.put("retryCount", null);
 
-        when(mailDao.selectList("alarm.selectPendingQueue", null))
+        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
             .thenReturn(Collections.singletonList(testQueueMessage));
         when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
             .thenReturn(testTableData);
         when(mailDao.selectList(eq("alarm.selectRecipientsByConditions"), anyMap()))
             .thenReturn(testAdmUsers);
-        doThrow(new RuntimeException("Error"))
+        doReturn(false)
             .when(mailService).sendMail(any(MailRequest.class));
 
         // When
@@ -484,7 +485,7 @@ class AlarmMailServiceTest {
             createMap("orderId", "001", "notes", null)
         );
 
-        when(mailDao.selectList("alarm.selectPendingQueue", null))
+        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
             .thenReturn(Collections.singletonList(testQueueMessage));
         when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
             .thenReturn(testTableData);
@@ -526,7 +527,7 @@ class AlarmMailServiceTest {
             createMap("userId", "SALES001", "email", "sales1@company.com", "group", "SALES")
         );
 
-        when(mailDao.selectList("alarm.selectPendingQueue", null))
+        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
             .thenReturn(Collections.singletonList(testQueueMessage));
         when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
             .thenReturn(testTableData);
@@ -557,7 +558,7 @@ class AlarmMailServiceTest {
             createMap("userId", "SALES001", "email", "sales1@company.com", "group", "SALES")
         );
 
-        when(mailDao.selectList("alarm.selectPendingQueue", null))
+        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
             .thenReturn(Collections.singletonList(testQueueMessage));
         when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
             .thenReturn(testTableData);
@@ -583,7 +584,7 @@ class AlarmMailServiceTest {
             createMap("userId", "LOGISTIC001", "email", "logistic1@company.com", "group", "LOGISTICS")
         );
 
-        when(mailDao.selectList("alarm.selectPendingQueue", null))
+        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
             .thenReturn(Collections.singletonList(testQueueMessage));
         when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
             .thenReturn(testTableData);
@@ -604,7 +605,7 @@ class AlarmMailServiceTest {
         testQueueMessage.put("recipientUserIds", null);
         testQueueMessage.put("recipientGroups", null);
 
-        when(mailDao.selectList("alarm.selectPendingQueue", null))
+        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
             .thenReturn(Collections.singletonList(testQueueMessage));
         when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
             .thenReturn(testTableData);
@@ -629,7 +630,7 @@ class AlarmMailServiceTest {
         testQueueMessage.put("recipientUserIds", "");
         testQueueMessage.put("recipientGroups", "  ");
 
-        when(mailDao.selectList("alarm.selectPendingQueue", null))
+        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
             .thenReturn(Collections.singletonList(testQueueMessage));
         when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
             .thenReturn(testTableData);
@@ -655,7 +656,7 @@ class AlarmMailServiceTest {
             createMap("userId", "ADMIN1", "email", "admin1@company.com", "group", "ADM")
         );
 
-        when(mailDao.selectList("alarm.selectPendingQueue", null))
+        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
             .thenReturn(Collections.singletonList(testQueueMessage));
         when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
             .thenReturn(testTableData);
@@ -686,7 +687,7 @@ class AlarmMailServiceTest {
             createMap("userId", "ADMIN2", "email", "admin2@company.com", "group", "ADM")
         );
 
-        when(mailDao.selectList("alarm.selectPendingQueue", null))
+        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
             .thenReturn(Collections.singletonList(testQueueMessage));
         when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
             .thenReturn(testTableData);
@@ -711,7 +712,7 @@ class AlarmMailServiceTest {
             createMap("userId", "ADMIN1", "email", "admin1@company.com", "group", "ADM")
         );
 
-        when(mailDao.selectList("alarm.selectPendingQueue", null))
+        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
             .thenReturn(Collections.singletonList(testQueueMessage));
         when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
             .thenReturn(testTableData);
@@ -739,7 +740,7 @@ class AlarmMailServiceTest {
             createMap("userId", "ADMIN1", "email", "admin1@company.com", "group", "ADM")
         );
 
-        when(mailDao.selectList("alarm.selectPendingQueue", null))
+        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
             .thenReturn(Collections.singletonList(testQueueMessage));
         when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
             .thenReturn(testTableData);

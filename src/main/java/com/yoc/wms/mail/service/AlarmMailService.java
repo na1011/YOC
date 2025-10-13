@@ -3,6 +3,7 @@ package com.yoc.wms.mail.service;
 import com.yoc.wms.mail.dao.MailDao;
 import com.yoc.wms.mail.domain.MailRequest;
 import com.yoc.wms.mail.domain.Recipient;
+import com.yoc.wms.mail.exception.ValueChainException;
 import com.yoc.wms.mail.util.MailUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -48,7 +49,10 @@ public class AlarmMailService {
     @Transactional
     public void processQueue() {
         try {
-            List<Map<String, Object>> messages = mailDao.selectList("alarm.selectPendingQueue", null);
+            // 배치 크기 제한 (긴 트랜잭션 방지)
+            Map<String, Object> params = new HashMap<>();
+            params.put("limit", 10);
+            List<Map<String, Object>> messages = mailDao.selectList("alarm.selectPendingQueue", params);
 
             if (messages == null || messages.isEmpty()) {
                 return;
@@ -61,8 +65,10 @@ public class AlarmMailService {
             }
 
         } catch (Exception e) {
-            System.err.println("큐 처리 실패: " + e.getMessage());
+            // 시스템 오류만 catch (DB 커넥션 끊김, OutOfMemory 등)
+            System.err.println("큐 처리 시스템 오류: " + e.getMessage());
             e.printStackTrace();
+            // 트랜잭션 롤백됨 (정상 동작)
         }
     }
 
@@ -117,17 +123,21 @@ public class AlarmMailService {
 
             MailRequest request = builder.build();
 
-            // 4. MailService 호출 (발송 + 로그 자동 처리)
-            mailService.sendMail(request);
+            // 4. MailService 호출 (boolean 반환)
+            boolean success = mailService.sendMail(request);
 
-            // 5. 큐 성공 처리
-            Map<String, Object> updateParams = new HashMap<>();
-            updateParams.put("queueId", queueId);
-            mailDao.update("alarm.updateQueueSuccess", updateParams);
-
-            System.out.println("✅ 알람 발송 성공: " + mailSource + " (수신인 " + recipients.size() + "명)");
+            // 5. 성공/실패 처리
+            if (success) {
+                Map<String, Object> updateParams = new HashMap<>();
+                updateParams.put("queueId", queueId);
+                mailDao.update("alarm.updateQueueSuccess", updateParams);
+                System.out.println("✅ 알람 발송 성공: " + mailSource + " (수신인 " + recipients.size() + "명)");
+            } else {
+                handleFailure(queueId, mailSource, retryCount, new Exception("메일 발송 실패"));
+            }
 
         } catch (Exception e) {
+            // 예상치 못한 시스템 오류 (수신인 조회 실패, SQL 오류 등)
             handleFailure(queueId, mailSource, retryCount, e);
         }
     }
@@ -158,11 +168,40 @@ public class AlarmMailService {
     }
 
     /**
-     * 수신인 정보를 바탕으로 실제 Recipient 목록 생성
+     * 동적 수신인 조회 (사용자 ID + 그룹 통합)
      *
-     * @param recipientUserIds 콤마 구분 사용자 ID (예: "USER001,USER002", NULL 가능)
-     * @param recipientGroups 콤마 구분 그룹명 (예: "ADM,SALES", NULL 가능)
-     * @return 중복 제거된 Recipient 목록
+     * RECIPIENT_USER_IDS와 RECIPIENT_GROUPS를 동적으로 조회하여 실제 Recipient 목록을 생성합니다.
+     *
+     * Features (v2.1.0+):
+     * - 유연한 조합: 사용자 ID / 그룹 / 조합 모두 가능
+     * - NULL 기본값: 둘 다 NULL이면 ADM 그룹 자동 발송
+     * - 대소문자 정규화: Recipient.fromMap()에서 일원화 (v2.1.1)
+     * - 중복 제거: 이메일 기준 (fromMapList 내부 처리)
+     *
+     * Logic Flow:
+     * 1. NULL 체크 → 둘 다 NULL이면 ADM 그룹 기본 설정
+     * 2. 콤마 split → trim (정규화는 Recipient 클래스에 위임)
+     * 3. MyBatis 통합 쿼리 호출 (alarm.selectRecipientsByConditions)
+     * 4. Recipient.fromMapList()로 변환 + 중복 제거
+     * 5. 빈 결과 → ValueChainException 발생
+     *
+     * Spring 3.2 ASM 호환 (v2.1.3):
+     * - Arrays.stream().map().filter().collect() 제거
+     * - for-loop + 수동 필터링으로 전환
+     *
+     * Example QUEUE Data:
+     *   RECIPIENT_USER_IDS: "ADMIN1,sales001" (대소문자 혼용)
+     *   RECIPIENT_GROUPS: "ADM,LOGISTICS"
+     *   → DB 조회: ["admin@test.com", "sales@test.com", "logistics@test.com"]
+     *   → Recipient: USER_ID 대문자, EMAIL 소문자, 중복 제거
+     *
+     * @param recipientUserIds 콤마 구분 사용자 ID (NULL 가능, 대소문자 혼용 가능)
+     * @param recipientGroups 콤마 구분 그룹명 (NULL 가능, 대소문자 혼용 가능)
+     * @return 중복 제거된 Recipient 목록 (이메일 기준)
+     * @throws ValueChainException 수신인 조회 결과가 없는 경우
+     * @since v2.1.0 (동적 수신인 조회 도입)
+     * @since v2.1.1 (대소문자 정규화 Recipient 일원화)
+     * @since v2.1.3 (Spring 3.2 호환 for-loop 전환)
      */
     private List<Recipient> resolveRecipients(String recipientUserIds, String recipientGroups) {
         // 1. NULL 체크 및 기본값 설정 (알람 메일 전용)
@@ -217,7 +256,7 @@ public class AlarmMailService {
 
         // 6. 유효성 검증
         if (recipients.isEmpty()) {
-            throw new IllegalStateException(
+            throw new ValueChainException(
                     "수신인 조회 결과가 없습니다. " +
                             "userIds=" + userIdList + ", groups=" + groupList
             );
@@ -230,13 +269,31 @@ public class AlarmMailService {
     }
 
     /**
-     * Map<String, Object> → Map<String, String> 변환
-     * Spring 3.2 ASM 호환성을 위해 for-loop 사용 (lambda/forEach 제거)
+     * Map 타입 변환 (Object → String, 테이블 렌더링용)
+     *
+     * MyBatis 조회 결과를 MailRequest.addTableSection()에 전달 가능한 형식으로 변환합니다.
+     *
+     * Why LinkedHashMap:
+     * - MailBodyRenderer가 map.keySet()을 순회하며 테이블 헤더 생성
+     * - HashMap은 순서 미보장 → 컬럼 순서가 매번 변경될 수 있음
+     * - LinkedHashMap은 삽입 순서 유지 → DB 쿼리 결과 순서 그대로 반영
+     *
+     * Example:
+     *   Input:  [{orderId=1, customerName="홍길동", status=10}]  (Integer status)
+     *   Output: [{orderId="1", customerName="홍길동", status="10"}]  (All String)
+     *
+     * Spring 3.2 ASM 호환 (v2.1.3):
+     * - Before: maps.stream().map(m -> {...}).collect(Collectors.toList())
+     * - After: 중첩 for-loop (Lambda 제거)
+     *
+     * @param source MyBatis 조회 결과 (List<Map<String, Object>>)
+     * @return String으로 변환된 Map 리스트 (LinkedHashMap으로 순서 보장)
+     * @since v2.1.3 (Spring 3.2 호환 for-loop 전환)
      */
     private List<Map<String, String>> convertToStringMap(List<Map<String, Object>> source) {
         List<Map<String, String>> result = new ArrayList<>();
         for (Map<String, Object> map : source) {
-            Map<String, String> stringMap = new LinkedHashMap<>();
+            Map<String, String> stringMap = new LinkedHashMap<>();  // 순서 보장
             for (Map.Entry<String, Object> entry : map.entrySet()) {
                 stringMap.put(entry.getKey(), entry.getValue() != null ? entry.getValue().toString() : "");
             }

@@ -1,6 +1,7 @@
 package com.yoc.wms.mail.renderer;
 
 import com.yoc.wms.mail.config.MailConfig;
+import com.yoc.wms.mail.exception.ValueChainException;
 import com.yoc.wms.mail.domain.MailSection;
 import com.yoc.wms.mail.enums.SectionType;
 import org.junit.jupiter.api.BeforeEach;
@@ -385,7 +386,7 @@ class MailBodyRendererTest {
     void renderTable_emptyData() {
         // When & Then
         // validate()에서 예외 발생 (TABLE type requires data)
-        assertThrows(IllegalArgumentException.class, () ->
+        assertThrows(ValueChainException.class, () ->
             MailSection.builder()
                 .type(SectionType.TABLE)
                 .data(Collections.emptyList())
@@ -614,6 +615,95 @@ class MailBodyRendererTest {
 
         // Then
         assertTrue(html.length() > 10000);
+    }
+
+    // ==================== forContact() Factory Method 테스트 ====================
+
+    @Test
+    @DisplayName("forContact: 섹션 구조 - DIVIDER + TEXT")
+    void forContact_sectionStructure() {
+        // Given
+        String contactInfo = "IT: it@company.com";
+
+        // When
+        List<MailSection> sections = MailSection.forContact(contactInfo);
+
+        // Then
+        assertNotNull(sections);
+        assertEquals(2, sections.size());
+        assertEquals(SectionType.DIVIDER, sections.get(0).getType());
+        assertEquals(SectionType.TEXT, sections.get(1).getType());
+        assertEquals("📞 문의", sections.get(1).getTitle());
+        assertEquals(contactInfo, sections.get(1).getContent());
+    }
+
+    @Test
+    @DisplayName("forContact: HTML 렌더링 - 구분선 + 문의 섹션")
+    void forContact_htmlRendering() {
+        // Given
+        String contactInfo = "IT: it@company.com";
+        List<MailSection> sections = MailSection.forContact(contactInfo);
+
+        // When
+        String html = renderer.render(sections);
+
+        // Then
+        assertTrue(html.contains("<hr")); // 구분선
+        assertTrue(html.contains("📞 문의")); // 제목
+        assertTrue(html.contains("IT: it@company.com")); // 내용
+    }
+
+    @Test
+    @DisplayName("forContact: 줄바꿈 변환 - contact 1~3 모두 있을 때")
+    void forContact_multipleContacts() {
+        // Given
+        String contactInfo = "IT: it@company.com\nHR: hr@company.com\n법무: legal@company.com";
+        List<MailSection> sections = MailSection.forContact(contactInfo);
+
+        // When
+        String html = renderer.render(sections);
+
+        // Then
+        assertTrue(html.contains("📞 문의"));
+        assertTrue(html.contains("IT: it@company.com"));
+        assertTrue(html.contains("HR: hr@company.com"));
+        assertTrue(html.contains("법무: legal@company.com"));
+
+        // 줄바꿈이 <br>로 변환되었는지 확인
+        int brCount = countOccurrences(html, "<br>");
+        assertEquals(2, brCount); // 3줄이므로 줄바꿈 2개
+    }
+
+    @Test
+    @DisplayName("forContact: contact 1만 있을 때 - 줄바꿈 없음")
+    void forContact_singleContact() {
+        // Given
+        String contactInfo = "IT Support: support@company.com";
+        List<MailSection> sections = MailSection.forContact(contactInfo);
+
+        // When
+        String html = renderer.render(sections);
+
+        // Then
+        assertTrue(html.contains("📞 문의"));
+        assertTrue(html.contains("IT Support: support@company.com"));
+        assertFalse(html.contains("<br>")); // 줄바꿈 없음
+    }
+
+    @Test
+    @DisplayName("forContact: HTML 이스케이프 - 특수문자 포함")
+    void forContact_htmlEscape() {
+        // Given
+        String contactInfo = "IT: <admin@company.com> & Support";
+        List<MailSection> sections = MailSection.forContact(contactInfo);
+
+        // When
+        String html = renderer.render(sections);
+
+        // Then
+        assertTrue(html.contains("&lt;admin@company.com&gt;"));
+        assertTrue(html.contains("&amp; Support"));
+        assertFalse(html.contains("<admin@company.com>")); // 이스케이프되어야 함
     }
 
     // ==================== Helper Methods ====================

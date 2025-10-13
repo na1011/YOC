@@ -56,6 +56,9 @@ class AlarmMailServiceIntegrationTest {
         // MockBean 초기화
         reset(mailService);
 
+        // 기본 동작: 메일 발송 성공 (실패 케이스는 개별 테스트에서 override)
+        when(mailService.sendMail(any(MailRequest.class))).thenReturn(true);
+
         System.out.println("\n========================================");
         System.out.println("AlarmMailService 통합 테스트 시작");
         System.out.println("큐 초기화 완료");
@@ -165,9 +168,8 @@ class AlarmMailServiceIntegrationTest {
         queueData.put("retryCount", 0);
         mailDao.insert("alarm.insertTestQueue", queueData);
 
-        // MailService가 예외 발생하도록 설정
-        doThrow(new RuntimeException("SMTP 연결 실패"))
-                .when(mailService).sendMail(any(MailRequest.class));
+        // MailService가 실패하도록 설정 (boolean false 반환)
+        doReturn(false).when(mailService).sendMail(any(MailRequest.class));
 
         // When
         alarmMailService.processQueue();
@@ -203,9 +205,8 @@ class AlarmMailServiceIntegrationTest {
         queueData.put("retryCount", 2);  // 이미 2회 재시도
         mailDao.insert("alarm.insertTestQueue", queueData);
 
-        // MailService가 예외 발생
-        doThrow(new RuntimeException("최종 실패"))
-                .when(mailService).sendMail(any(MailRequest.class));
+        // MailService가 실패하도록 설정 (boolean false 반환)
+        doReturn(false).when(mailService).sendMail(any(MailRequest.class));
 
         // When
         alarmMailService.processQueue();

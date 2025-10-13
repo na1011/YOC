@@ -51,7 +51,7 @@ class MailServiceIntegrationTest {
             .build());
         testRecipients.add(Recipient.builder()
             .userId("USER")
-            .email("seongbin_heo@youngone.co.kr")
+            .email("seongbin_heo@test.co.kr")
             .group("USER")
             .build());
 
@@ -156,7 +156,6 @@ class MailServiceIntegrationTest {
 
         // Then
         System.out.println("✅ 메일 발송 요청 완료");
-        System.out.println("수신자: chanki_kim@youngone.co.kr, zerus94@naver.com");
         System.out.println("제목: [통합테스트] 복수 섹션 메일");
         System.out.println("섹션 수: 4개 (TEXT + TABLE + DIVIDER + TEXT)");
     }

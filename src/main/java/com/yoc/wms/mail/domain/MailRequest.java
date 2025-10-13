@@ -1,6 +1,7 @@
 package com.yoc.wms.mail.domain;
 
 import com.yoc.wms.mail.enums.SectionType;
+import com.yoc.wms.mail.exception.ValueChainException;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -34,13 +35,13 @@ public class MailRequest {
 
     private void validate() {
         if (subject == null || subject.trim().isEmpty()) {
-            throw new IllegalArgumentException("Subject is required");
+            throw new ValueChainException("Subject is required");
         }
         if (sections == null || sections.isEmpty()) {
-            throw new IllegalArgumentException("At least one section is required");
+            throw new ValueChainException("At least one section is required");
         }
         if (recipients == null || recipients.isEmpty()) {
-            throw new IllegalArgumentException("At least one recipient is required");
+            throw new ValueChainException("At least one recipient is required");
         }
     }
 
@@ -76,12 +77,23 @@ public class MailRequest {
     // ==================== Helper Methods (도메인 로직 캡슐화) ====================
 
     /**
-     * 알람 Subject 생성
+     * 알람 Subject 생성 (Helper Method)
      *
-     * @param title 제목
-     * @param severity 심각도 (CRITICAL/WARNING/INFO)
-     * @param count 건수
-     * @return 알람 Subject (예: "[긴급] WMS 재고 부족 알림 2건")
+     * 심각도와 건수를 포함한 표준화된 Subject를 생성합니다.
+     *
+     * Format:
+     * - CRITICAL: "[긴급] WMS {title} {count}건"
+     * - WARNING/INFO: "[경고] WMS {title} {count}건"
+     *
+     * Example:
+     *   String subject = MailRequest.alarmSubject("재고 부족 알림", "CRITICAL", 5);
+     *   // Result: "[긴급] WMS 재고 부족 알림 5건"
+     *
+     * @param title 알람 제목 (null 불가)
+     * @param severity 심각도 (CRITICAL/WARNING/INFO, 대소문자 무관)
+     * @param count 건수 (0 이상)
+     * @return 표준화된 Subject
+     * @since v2.0.0
      */
     public static String alarmSubject(String title, String severity, int count) {
         String prefix = "CRITICAL".equalsIgnoreCase(severity) ? "[긴급]" : "[경고]";
@@ -89,11 +101,23 @@ public class MailRequest {
     }
 
     /**
-     * 알람 제목 생성 (심각도 아이콘 포함)
+     * 알람 제목 생성 (Helper Method - 심각도 아이콘 포함)
      *
-     * @param title 제목
-     * @param severity 심각도
-     * @return 아이콘 + 제목 (예: "⚠️ 재고 부족 알림")
+     * 심각도에 따른 아이콘을 제목 앞에 추가합니다.
+     *
+     * Severity Icons:
+     * - CRITICAL: 🔴 (빨간 원)
+     * - WARNING: ⚠️ (경고 표시)
+     * - INFO: ℹ️ (정보 표시)
+     *
+     * Example:
+     *   String title = MailRequest.alarmTitle("재고 부족 알림", "CRITICAL");
+     *   // Result: "🔴 재고 부족 알림"
+     *
+     * @param title 알람 제목
+     * @param severity 심각도 (CRITICAL/WARNING/INFO, 대소문자 무관)
+     * @return 아이콘 + 제목
+     * @since v2.0.0
      */
     public static String alarmTitle(String title, String severity) {
         return getSeverityIcon(severity) + " " + title;

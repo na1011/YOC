@@ -202,7 +202,7 @@ class MailServiceTest {
     @DisplayName("sendMail: 빈 수신인 목록 - 빌드 시 검증 실패")
     void sendMail_emptyRecipients() {
         // When & Then
-        assertThrows(IllegalArgumentException.class, () ->
+        assertThrows(ValueChainException.class, () ->
             MailRequest.builder()
                 .subject("제목")
                 .addTextSection("내용")
@@ -287,10 +287,11 @@ class MailServiceTest {
         doThrow(new RuntimeException("Persistent error"))
             .when(mailSender).send(any(MimeMessage.class));
 
-        // When & Then
-        assertThrows(ValueChainException.class, () ->
-            mailService.sendMail(testRequest)
-        );
+        // When
+        boolean result = mailService.sendMail(testRequest);
+
+        // Then - false 반환 확인
+        assertFalse(result, "All retries failed should return false");
 
         // 3회 시도 확인
         verify(mailSender, times(3)).send(any(MimeMessage.class));

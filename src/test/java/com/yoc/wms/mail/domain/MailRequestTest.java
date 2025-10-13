@@ -1,5 +1,6 @@
 package com.yoc.wms.mail.domain;
 
+import com.yoc.wms.mail.exception.ValueChainException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -323,7 +324,7 @@ class MailRequestTest {
     @DisplayName("검증 실패: subject가 null")
     void validation_nullSubject() {
         // When & Then
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+        ValueChainException ex = assertThrows(ValueChainException.class, () ->
             MailRequest.builder()
                 .addDivider()
                 .addRecipient(TEST_RECIPIENT)
@@ -336,7 +337,7 @@ class MailRequestTest {
     @DisplayName("검증 실패: subject가 빈 문자열")
     void validation_emptySubject() {
         // When & Then
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+        ValueChainException ex = assertThrows(ValueChainException.class, () ->
             MailRequest.builder()
                 .subject("")
                 .addDivider()
@@ -350,7 +351,7 @@ class MailRequestTest {
     @DisplayName("검증 실패: subject가 공백")
     void validation_blankSubject() {
         // When & Then
-        assertThrows(IllegalArgumentException.class, () ->
+        assertThrows(ValueChainException.class, () ->
             MailRequest.builder()
                 .subject("   ")
                 .addDivider()
@@ -363,7 +364,7 @@ class MailRequestTest {
     @DisplayName("검증 실패: sections가 빈 리스트")
     void validation_emptySections() {
         // When & Then
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+        ValueChainException ex = assertThrows(ValueChainException.class, () ->
             MailRequest.builder()
                 .subject("제목")
                 .addRecipient(TEST_RECIPIENT)
@@ -376,7 +377,7 @@ class MailRequestTest {
     @DisplayName("검증 실패: recipients가 null")
     void validation_nullRecipients() {
         // When & Then
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+        ValueChainException ex = assertThrows(ValueChainException.class, () ->
             MailRequest.builder()
                 .subject("제목")
                 .addDivider()
@@ -390,7 +391,7 @@ class MailRequestTest {
     @DisplayName("검증 실패: recipients가 빈 리스트")
     void validation_emptyRecipients() {
         // When & Then
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+        ValueChainException ex = assertThrows(ValueChainException.class, () ->
             MailRequest.builder()
                 .subject("제목")
                 .addDivider()

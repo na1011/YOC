@@ -20,6 +20,31 @@ public class Recipient {
         this.group = group;
     }
 
+    /**
+     * Map을 Recipient로 변환 (대소문자 정규화 포함)
+     *
+     * 대소문자 정규화 일원화 (v2.1.1):
+     * - USER_ID: 대문자로 정규화 (DB 저장 규칙)
+     * - EMAIL: 소문자로 정규화 (이메일 표준)
+     * - Service/SQL 계층에서는 trim만 수행, 정규화는 이 메서드에서 일원화
+     *
+     * Map 구조:
+     *   {userId: String, email: String, group: String}
+     *
+     * Example:
+     *   Map<String, Object> map = new HashMap<>();
+     *   map.put("userId", "admin");       // 소문자 입력
+     *   map.put("email", "Admin@Test.Co.Kr");  // 대소문자 혼용
+     *   map.put("group", "ADM");
+     *
+     *   Recipient r = Recipient.fromMap(map);
+     *   // r.getUserId() = "ADMIN" (대문자)
+     *   // r.getEmail() = "admin@test.co.kr" (소문자)
+     *
+     * @param map MyBatis 조회 결과 (Map<String, Object>)
+     * @return 정규화된 Recipient 객체
+     * @since v2.1.1 (대소문자 정규화 일원화)
+     */
     public static Recipient fromMap(Map<String, Object> map) {
         String userId = (String) map.get("userId");    // user → userId
         String email = (String) map.get("email");
@@ -41,8 +66,37 @@ public class Recipient {
     /**
      * Map 리스트를 Recipient 리스트로 변환 (중복 제거 포함)
      *
+     * MyBatis 조회 결과를 Recipient 리스트로 변환하며, 이메일 기준 중복을 자동 제거합니다.
+     *
+     * Features:
+     * - 대소문자 정규화: fromMap()에서 자동 처리 (v2.1.1)
+     * - 중복 제거: 이메일 기준 (equals/hashCode)
+     * - 순서 보장: LinkedHashSet 사용 (DB 쿼리 결과 순서 유지)
+     * - null-safe: null/empty 입력 시 빈 리스트 반환
+     *
+     * Spring 3.2 ASM 호환 (v2.1.3):
+     * - Lambda/Stream API 대신 for-loop 사용
+     * - Collectors.toCollection(LinkedHashSet::new) 제거
+     *
+     * Before (v2.1.2):
+     *   Set<Recipient> set = maps.stream()
+     *       .map(Recipient::fromMap)
+     *       .collect(Collectors.toCollection(LinkedHashSet::new));
+     *
+     * After (v2.1.3):
+     *   Set<Recipient> set = new LinkedHashSet<>();
+     *   for (Map<String, Object> map : maps) {
+     *       set.add(fromMap(map));
+     *   }
+     *
+     * Example:
+     *   List<Map<String, Object>> maps = mailDao.selectList("alarm.selectRecipients", null);
+     *   List<Recipient> recipients = Recipient.fromMapList(maps);  // 1줄로 변환 + 중복 제거
+     *
      * @param maps MyBatis 조회 결과 (List<Map<String, Object>>)
      * @return 중복 제거된 Recipient 리스트 (이메일 기준, 순서 보장)
+     * @since v2.1.2 (초기 도입)
+     * @since v2.1.3 (Spring 3.2 호환 for-loop 전환)
      */
     public static List<Recipient> fromMapList(List<Map<String, Object>> maps) {
         if (maps == null || maps.isEmpty()) {
