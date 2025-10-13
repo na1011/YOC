@@ -13,7 +13,6 @@ import com.yoc.wms.mail.util.MailUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -51,16 +50,8 @@ public class MailService {
      *
      * @param request 메일 요청 DTO
      */
-    public void sendMail(MailRequest request) {
-        sendMailAsync(request);
-    }
-
-    /**
-     * 비동기 메일 발송
-     */
-    @Async
     @Transactional
-    protected void sendMailAsync(MailRequest request) {
+    public void sendMail(MailRequest request) {
         try {
             // 1. 수신인 검증
             MailUtils.validateRecipients(request.getRecipients());
@@ -69,8 +60,12 @@ public class MailService {
             List<MailSection> sections = new ArrayList<>(request.getSections());
             sections.addAll(MailSection.forContact(mailConfig.getContactInfo()));
 
-            // 3. HTML 생성
-            String htmlBody = wrapWithHtmlStructure(renderer.render(sections));
+            // 3. HTML 생성 (완전한 문서 구조)
+            String htmlBody = renderer.renderWithStructure(
+                    sections,
+                    mailConfig.getSystemTitle(),
+                    mailConfig.getFooterMessage()
+            );
 
             // 4. 로그 생성
             Long logId = createLog(
@@ -94,27 +89,6 @@ public class MailService {
         } catch (Exception e) {
             throw new ValueChainException("메일 발송 실패: " + e.getMessage(), e);
         }
-    }
-
-    /**
-     * HTML 전체 구조로 감싸기
-     */
-    private String wrapWithHtmlStructure(String body) {
-        StringBuilder html = new StringBuilder();
-        html.append("<!DOCTYPE html>");
-        html.append("<html>");
-        html.append("<head><meta charset='UTF-8'></head>");
-        html.append("<body style='font-family: Arial, sans-serif; padding: 20px;'>");
-        html.append("<div style='max-width: 800px; margin: 0 auto;'>");
-        html.append("<h2 style='color: #333; border-bottom: 3px solid #4CAF50; padding-bottom: 10px;'>WMS 시스템 알림</h2>");
-        html.append(body);
-        html.append("<div style='margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; color: #999; font-size: 12px;'>");
-        html.append("본 메일은 WMS 시스템에서 자동 발송되었습니다.");
-        html.append("</div>");
-        html.append("</div>");
-        html.append("</body>");
-        html.append("</html>");
-        return html.toString();
     }
 
     /**
@@ -189,6 +163,7 @@ public class MailService {
 
     /**
      * 실제 메일 발송 (일괄)
+     * Spring 3.2 ASM 호환성을 위해 for-loop 사용 (lambda/method reference 제거)
      */
     private void doSendMail(List<Recipient> recipients, List<Recipient> ccRecipients,
                             String subject, String htmlBody) throws Exception {
@@ -197,15 +172,19 @@ public class MailService {
 
         helper.setFrom("wms-noreply@youngone.co.kr", "WMS 시스템");
 
-        String[] toEmails = recipients.stream()
-                .map(Recipient::getEmail)
-                .toArray(String[]::new);
+        // TO 수신인 변환
+        String[] toEmails = new String[recipients.size()];
+        for (int i = 0; i < recipients.size(); i++) {
+            toEmails[i] = recipients.get(i).getEmail();
+        }
         helper.setTo(toEmails);
 
+        // CC 수신인 변환
         if (ccRecipients != null && !ccRecipients.isEmpty()) {
-            String[] ccEmails = ccRecipients.stream()
-                    .map(Recipient::getEmail)
-                    .toArray(String[]::new);
+            String[] ccEmails = new String[ccRecipients.size()];
+            for (int i = 0; i < ccRecipients.size(); i++) {
+                ccEmails[i] = ccRecipients.get(i).getEmail();
+            }
             helper.setCc(ccEmails);
         }
 

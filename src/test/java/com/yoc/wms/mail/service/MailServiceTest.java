@@ -29,11 +29,9 @@ import static org.mockito.Mockito.*;
  * 테스트 범위:
  * - sendMail() 정상 흐름
  * - 수신인 검증 실패
- * - HTML 구조 생성
+ * - HTML 구조 생성 (renderWithStructure)
  * - 로그 생성 및 상태 업데이트
  * - 재시도 로직
- *
- * 주의: @Async 메서드는 실제 비동기 동작하지 않음 (단위 테스트)
  */
 @ExtendWith(MockitoExtension.class)
 class MailServiceTest {
@@ -77,12 +75,15 @@ class MailServiceTest {
 
         // MailConfig 기본 동작 설정 (lenient)
         lenient().when(mailConfig.getContactInfo()).thenReturn("문의: 010-1234-5678");
+        lenient().when(mailConfig.getSystemTitle()).thenReturn("WMS 시스템 알림");
+        lenient().when(mailConfig.getFooterMessage()).thenReturn("본 메일은 WMS 시스템에서 자동 발송되었습니다.");
 
         // JavaMailSender Mock 설정 (lenient)
         lenient().when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
 
         // Renderer Mock 설정 (lenient)
-        lenient().when(renderer.render(anyList())).thenReturn("<div>Rendered Body</div>");
+        lenient().when(renderer.renderWithStructure(anyList(), anyString(), anyString()))
+            .thenReturn("<!DOCTYPE html><html><body>Rendered Full HTML</body></html>");
     }
 
     // ==================== sendMail() 정상 흐름 테스트 ====================
@@ -100,16 +101,15 @@ class MailServiceTest {
         // When
         mailService.sendMail(testRequest);
 
-        // Then - 비동기이지만 테스트 환경에서는 동기로 실행됨
-        // 실제 검증은 sendMailAsync를 직접 호출하여 수행
-        verify(mailDao, timeout(1000).times(1)).insert(eq("mail.insertMailSendLog"), anyMap());
-        verify(mailSender, timeout(1000).times(1)).send(any(MimeMessage.class));
-        verify(mailDao, timeout(1000).times(1)).update(eq("mail.updateMailSendLogStatus"), anyMap());
+        // Then - 동기 실행이므로 즉시 검증
+        verify(mailDao, times(1)).insert(eq("mail.insertMailSendLog"), anyMap());
+        verify(mailSender, times(1)).send(any(MimeMessage.class));
+        verify(mailDao, times(1)).update(eq("mail.updateMailSendLogStatus"), anyMap());
     }
 
     @Test
-    @DisplayName("sendMailAsync: 로그 생성 검증")
-    void sendMailAsync_logCreation() {
+    @DisplayName("sendMail: 로그 생성 검증")
+    void sendMail_logCreation() {
         // Given
         when(mailDao.insert(eq("mail.insertMailSendLog"), anyMap())).thenAnswer(invocation -> {
             Map<String, Object> params = invocation.getArgument(1);
@@ -125,18 +125,19 @@ class MailServiceTest {
             return 1;
         });
 
-        // When - protected 메서드 직접 호출을 위해 reflection 사용하지 않고 public sendMail 호출
+        // When
         mailService.sendMail(testRequest);
 
         // Then
-        verify(mailDao, timeout(1000)).insert(eq("mail.insertMailSendLog"), anyMap());
+        verify(mailDao, times(1)).insert(eq("mail.insertMailSendLog"), anyMap());
     }
 
     @Test
-    @DisplayName("sendMailAsync: HTML 구조 생성")
-    void sendMailAsync_htmlGeneration() {
+    @DisplayName("sendMail: HTML 구조 생성 (renderWithStructure)")
+    void sendMail_htmlGeneration() {
         // Given
-        when(renderer.render(anyList())).thenReturn("<p>Body Content</p>");
+        when(renderer.renderWithStructure(anyList(), anyString(), anyString()))
+            .thenReturn("<!DOCTYPE html><html><body><h2>WMS 시스템 알림</h2><p>Body Content</p></body></html>");
         when(mailDao.insert(eq("mail.insertMailSendLog"), anyMap())).thenAnswer(invocation -> {
             Map<String, Object> params = invocation.getArgument(1);
             params.put("logId", 200L);
@@ -155,12 +156,12 @@ class MailServiceTest {
         mailService.sendMail(testRequest);
 
         // Then
-        verify(renderer, timeout(1000)).render(anyList());
+        verify(renderer, times(1)).renderWithStructure(anyList(), eq("WMS 시스템 알림"), eq("본 메일은 WMS 시스템에서 자동 발송되었습니다."));
     }
 
     @Test
-    @DisplayName("sendMailAsync: 연락처 섹션 자동 추가")
-    void sendMailAsync_contactSectionAdded() {
+    @DisplayName("sendMail: 연락처 섹션 자동 추가")
+    void sendMail_contactSectionAdded() {
         // Given
         when(mailConfig.getContactInfo()).thenReturn("담당자: 홍길동");
         when(mailDao.insert(anyString(), anyMap())).thenAnswer(invocation -> {
@@ -173,17 +174,17 @@ class MailServiceTest {
         mailService.sendMail(testRequest);
 
         // Then
-        verify(renderer, timeout(1000)).render(argThat(sections -> {
+        verify(renderer, times(1)).renderWithStructure(argThat(sections -> {
             // 원래 1개 섹션 + 연락처 섹션 (DIVIDER + TEXT) = 3개
             return sections.size() == 3;
-        }));
+        }), anyString(), anyString());
     }
 
     // ==================== 수신인 검증 테스트 ====================
 
     @Test
-    @DisplayName("sendMailAsync: 잘못된 이메일 - 검증 실패")
-    void sendMailAsync_invalidEmail() {
+    @DisplayName("sendMail: 잘못된 이메일 - 검증 실패")
+    void sendMail_invalidEmail() {
         // Given
         MailRequest invalidRequest = MailRequest.builder()
             .subject("제목")
@@ -198,8 +199,8 @@ class MailServiceTest {
     }
 
     @Test
-    @DisplayName("sendMailAsync: 빈 수신인 목록 - 빌드 시 검증 실패")
-    void sendMailAsync_emptyRecipients() {
+    @DisplayName("sendMail: 빈 수신인 목록 - 빌드 시 검증 실패")
+    void sendMail_emptyRecipients() {
         // When & Then
         assertThrows(IllegalArgumentException.class, () ->
             MailRequest.builder()
@@ -213,8 +214,8 @@ class MailServiceTest {
     // ==================== CC 수신인 테스트 ====================
 
     @Test
-    @DisplayName("sendMailAsync: CC 수신인 포함")
-    void sendMailAsync_withCc() {
+    @DisplayName("sendMail: CC 수신인 포함")
+    void sendMail_withCc() {
         // Given
         List<Recipient> ccRecipients = Collections.singletonList(
             Recipient.builder().email("cc@company.com").build()
@@ -240,7 +241,7 @@ class MailServiceTest {
         mailService.sendMail(requestWithCc);
 
         // Then
-        verify(mailDao, timeout(1000)).insert(eq("mail.insertMailSendLog"), anyMap());
+        verify(mailDao, times(1)).insert(eq("mail.insertMailSendLog"), anyMap());
     }
 
     // ==================== 재시도 로직 테스트 ====================
@@ -264,10 +265,10 @@ class MailServiceTest {
         mailService.sendMail(testRequest);
 
         // Then - 재시도로 인해 send() 2회 호출
-        verify(mailSender, timeout(15000).times(2)).send(any(MimeMessage.class));
+        verify(mailSender, times(2)).send(any(MimeMessage.class));
 
         // 최종적으로 SUCCESS 상태 업데이트
-        verify(mailDao, timeout(15000)).update(eq("mail.updateMailSendLogStatus"), argThat(params ->
+        verify(mailDao, times(1)).update(eq("mail.updateMailSendLogStatus"), argThat(params ->
             "SUCCESS".equals(params.get("sendStatus"))
         ));
     }
@@ -292,10 +293,10 @@ class MailServiceTest {
         );
 
         // 3회 시도 확인
-        verify(mailSender, timeout(30000).times(3)).send(any(MimeMessage.class));
+        verify(mailSender, times(3)).send(any(MimeMessage.class));
 
         // FAILURE 상태 업데이트
-        verify(mailDao, timeout(30000)).update(eq("mail.updateMailSendLogStatus"), argThat(params ->
+        verify(mailDao, times(1)).update(eq("mail.updateMailSendLogStatus"), argThat(params ->
             "FAILURE".equals(params.get("sendStatus"))
         ));
     }
@@ -324,7 +325,7 @@ class MailServiceTest {
         }
 
         // Then - 에러 메시지가 저장되었는지 확인
-        verify(mailDao, timeout(30000)).update(eq("mail.updateMailSendLogStatus"), anyMap());
+        verify(mailDao, times(1)).update(eq("mail.updateMailSendLogStatus"), anyMap());
     }
 
     @Test
@@ -350,7 +351,7 @@ class MailServiceTest {
         mailService.sendMail(requestWithNullSource);
 
         // Then
-        verify(mailDao, timeout(1000)).insert(eq("mail.insertMailSendLog"), anyMap());
+        verify(mailDao, times(1)).insert(eq("mail.insertMailSendLog"), anyMap());
     }
 
     @Test
@@ -375,9 +376,9 @@ class MailServiceTest {
         mailService.sendMail(multiSectionRequest);
 
         // Then - 3개 섹션 + 연락처 섹션 (DIVIDER + TEXT) = 5개
-        verify(renderer, timeout(1000)).render(argThat(sections ->
+        verify(renderer, times(1)).renderWithStructure(argThat(sections ->
             sections.size() == 5
-        ));
+        ), anyString(), anyString());
     }
 
     @Test
@@ -412,7 +413,7 @@ class MailServiceTest {
         mailService.sendMail(requestWithMany);
 
         // Then
-        verify(mailDao, timeout(1000)).insert(eq("mail.insertMailSendLog"), anyMap());
+        verify(mailDao, times(1)).insert(eq("mail.insertMailSendLog"), anyMap());
     }
 
     // ==================== Helper Methods ====================

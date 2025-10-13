@@ -7,7 +7,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 /**
  * 메일 발송 관련 유틸리티
@@ -108,6 +107,7 @@ public class MailUtils {
 
     /**
      * 수신인 목록을 콤마 구분 문자열로 변환
+     * Spring 3.2 ASM 호환성을 위해 for-loop 사용 (lambda/method reference 제거)
      *
      * @param recipients 수신인 목록
      * @return 콤마 구분 이메일 문자열 (예: "user1@a.com,user2@a.com")
@@ -117,8 +117,13 @@ public class MailUtils {
             return "";
         }
 
-        return recipients.stream()
-                .map(Recipient::getEmail)
-                .collect(Collectors.joining(","));
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < recipients.size(); i++) {
+            if (i > 0) {
+                sb.append(",");
+            }
+            sb.append(recipients.get(i).getEmail());
+        }
+        return sb.toString();
     }
 }

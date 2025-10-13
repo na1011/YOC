@@ -51,6 +51,94 @@ class MailBodyRendererTest {
         lenient().when(mailConfig.getDividerMargin()).thenReturn("16px 0");
     }
 
+    // ==================== renderWithStructure() 테스트 ====================
+
+    @Test
+    @DisplayName("renderWithStructure: 완전한 HTML 문서 구조 생성")
+    void renderWithStructure_fullDocument() {
+        // Given
+        List<MailSection> sections = Collections.singletonList(
+            MailSection.builder().type(SectionType.TEXT).content("테스트 내용").build()
+        );
+
+        // When
+        String html = renderer.renderWithStructure(sections, "WMS 시스템 알림", "자동 발송 메일입니다.");
+
+        // Then
+        assertTrue(html.contains("<!DOCTYPE html>"));
+        assertTrue(html.contains("<html>"));
+        assertTrue(html.contains("<head><meta charset='UTF-8'></head>"));
+        assertTrue(html.contains("<body"));
+        assertTrue(html.contains("WMS 시스템 알림"));
+        assertTrue(html.contains("테스트 내용"));
+        assertTrue(html.contains("자동 발송 메일입니다."));
+        assertTrue(html.contains("</body>"));
+        assertTrue(html.contains("</html>"));
+    }
+
+    @Test
+    @DisplayName("renderWithStructure: systemTitle HTML 이스케이프")
+    void renderWithStructure_escapeSystemTitle() {
+        // Given
+        List<MailSection> sections = Collections.singletonList(
+            MailSection.builder().type(SectionType.TEXT).content("내용").build()
+        );
+
+        // When
+        String html = renderer.renderWithStructure(sections, "<script>alert('xss')</script>", "Footer");
+
+        // Then
+        assertTrue(html.contains("&lt;script&gt;"));
+        assertFalse(html.contains("<script>alert('xss')</script>"));
+    }
+
+    @Test
+    @DisplayName("renderWithStructure: footerMessage HTML 이스케이프")
+    void renderWithStructure_escapeFooterMessage() {
+        // Given
+        List<MailSection> sections = Collections.singletonList(
+            MailSection.builder().type(SectionType.TEXT).content("내용").build()
+        );
+
+        // When
+        String html = renderer.renderWithStructure(sections, "Title", "<b>Bold</b> & Text");
+
+        // Then
+        assertTrue(html.contains("&lt;b&gt;Bold&lt;/b&gt; &amp; Text"));
+        assertFalse(html.contains("<b>Bold</b>"));
+    }
+
+    @Test
+    @DisplayName("renderWithStructure: 여러 섹션 포함")
+    void renderWithStructure_multipleSections() {
+        // Given
+        List<MailSection> sections = Arrays.asList(
+            MailSection.builder().type(SectionType.TEXT).content("A").build(),
+            MailSection.builder().type(SectionType.DIVIDER).build(),
+            MailSection.builder().type(SectionType.TEXT).content("B").build()
+        );
+
+        // When
+        String html = renderer.renderWithStructure(sections, "Title", "Footer");
+
+        // Then
+        assertTrue(html.contains("A"));
+        assertTrue(html.contains("B"));
+        assertTrue(html.contains("<hr"));
+    }
+
+    @Test
+    @DisplayName("renderWithStructure: 빈 섹션 - body는 비어있지만 구조는 유지")
+    void renderWithStructure_emptySections() {
+        // When
+        String html = renderer.renderWithStructure(Collections.emptyList(), "Title", "Footer");
+
+        // Then
+        assertTrue(html.contains("<!DOCTYPE html>"));
+        assertTrue(html.contains("Title"));
+        assertTrue(html.contains("Footer"));
+    }
+
     // ==================== render() 통합 테스트 ====================
 
     @Test

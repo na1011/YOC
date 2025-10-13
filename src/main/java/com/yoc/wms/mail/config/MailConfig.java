@@ -81,6 +81,13 @@ public class MailConfig {
     @Value("${mail.style.divider.margin:30px 0}")
     private String dividerMargin;
 
+    // ========== HTML 구조 설정 ==========
+    @Value("${mail.structure.system.title:WMS 시스템 알림}")
+    private String systemTitle;
+
+    @Value("${mail.structure.footer.message:본 메일은 WMS 시스템에서 자동 발송되었습니다.}")
+    private String footerMessage;
+
     // ========== Getter 메서드 ==========
 
     public String getFontFamily() { return fontFamily; }
@@ -105,6 +112,9 @@ public class MailConfig {
     public String getDividerHeight() { return dividerHeight; }
     public String getDividerColor() { return dividerColor; }
     public String getDividerMargin() { return dividerMargin; }
+
+    public String getSystemTitle() { return systemTitle; }
+    public String getFooterMessage() { return footerMessage; }
 
     /**
      * 연락처 정보 반환 (HTML 형식)

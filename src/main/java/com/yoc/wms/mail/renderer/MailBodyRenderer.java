@@ -21,7 +21,7 @@ public class MailBodyRenderer {
     private MailConfig mailConfig;
 
     /**
-     * 섹션 리스트를 HTML로 렌더링
+     * 섹션 리스트를 HTML로 렌더링 (본문만)
      */
     public String render(List<MailSection> sections) {
         if (sections == null || sections.isEmpty()) {
@@ -34,6 +34,36 @@ public class MailBodyRenderer {
             html.append(renderSection(section));
         }
 
+        return html.toString();
+    }
+
+    /**
+     * 섹션 리스트를 완전한 HTML 문서 구조로 렌더링
+     *
+     * @param sections 렌더링할 섹션 리스트
+     * @param systemTitle 시스템 타이틀 (예: "WMS 시스템 알림")
+     * @param footerMessage Footer 메시지 (예: "본 메일은 WMS 시스템에서 자동 발송되었습니다.")
+     * @return 완전한 HTML 문서
+     */
+    public String renderWithStructure(List<MailSection> sections, String systemTitle, String footerMessage) {
+        String body = render(sections);
+
+        StringBuilder html = new StringBuilder();
+        html.append("<!DOCTYPE html>");
+        html.append("<html>");
+        html.append("<head><meta charset='UTF-8'></head>");
+        html.append("<body style='font-family: Arial, sans-serif; padding: 20px;'>");
+        html.append("<div style='max-width: 800px; margin: 0 auto;'>");
+        html.append("<h2 style='color: #333; border-bottom: 3px solid #4CAF50; padding-bottom: 10px;'>");
+        html.append(escapeHtml(systemTitle));
+        html.append("</h2>");
+        html.append(body);
+        html.append("<div style='margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; color: #999; font-size: 12px;'>");
+        html.append(escapeHtml(footerMessage));
+        html.append("</div>");
+        html.append("</div>");
+        html.append("</body>");
+        html.append("</html>");
         return html.toString();
     }
 

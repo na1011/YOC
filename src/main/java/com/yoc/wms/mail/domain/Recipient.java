@@ -1,7 +1,6 @@
 package com.yoc.wms.mail.domain;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * 메일 수신인 정보
@@ -51,9 +50,11 @@ public class Recipient {
         }
 
         // LinkedHashSet으로 중복 제거 (이메일 기준, 순서 보장)
-        Set<Recipient> recipientSet = maps.stream()
-                .map(Recipient::fromMap)
-                .collect(Collectors.toCollection(LinkedHashSet::new));
+        // Spring 3.2 ASM 호환성을 위해 for-loop 사용 (lambda/method reference 제거)
+        Set<Recipient> recipientSet = new LinkedHashSet<>();
+        for (Map<String, Object> map : maps) {
+            recipientSet.add(fromMap(map));
+        }
 
         return new ArrayList<>(recipientSet);
     }

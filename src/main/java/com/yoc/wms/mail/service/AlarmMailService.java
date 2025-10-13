@@ -10,8 +10,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
-import java.util.stream.Collectors;
-import java.util.Arrays;
 
 /**
  * 알람 메일 발송 서비스
@@ -179,19 +177,28 @@ public class AlarmMailService {
         }
 
         // 2. 콤마 구분 문자열을 List로 변환 (trim만 수행, 정규화는 Recipient 클래스에서 담당)
-        List<String> userIdList = hasUserIds
-                ? Arrays.stream(recipientUserIds.split(","))
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .collect(Collectors.toList())
-                : Collections.emptyList();
+        // Spring 3.2 ASM 호환성을 위해 for-loop 사용 (lambda/method reference 제거)
+        List<String> userIdList = new ArrayList<>();
+        if (hasUserIds) {
+            String[] userIdTokens = recipientUserIds.split(",");
+            for (String token : userIdTokens) {
+                String trimmed = token.trim();
+                if (!trimmed.isEmpty()) {
+                    userIdList.add(trimmed);
+                }
+            }
+        }
 
-        List<String> groupList = hasGroups
-                ? Arrays.stream(recipientGroups.split(","))
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .collect(Collectors.toList())
-                : Collections.emptyList();
+        List<String> groupList = new ArrayList<>();
+        if (hasGroups) {
+            String[] groupTokens = recipientGroups.split(",");
+            for (String token : groupTokens) {
+                String trimmed = token.trim();
+                if (!trimmed.isEmpty()) {
+                    groupList.add(trimmed);
+                }
+            }
+        }
 
         // 3. MyBatis 파라미터 생성
         Map<String, Object> params = new HashMap<>();
@@ -224,15 +231,18 @@ public class AlarmMailService {
 
     /**
      * Map<String, Object> → Map<String, String> 변환
+     * Spring 3.2 ASM 호환성을 위해 for-loop 사용 (lambda/forEach 제거)
      */
     private List<Map<String, String>> convertToStringMap(List<Map<String, Object>> source) {
-        return source.stream()
-                .map(map -> {
-                    Map<String, String> stringMap = new LinkedHashMap<>();
-                    map.forEach((k, v) -> stringMap.put(k, v != null ? v.toString() : ""));
-                    return stringMap;
-                })
-                .collect(Collectors.toList());
+        List<Map<String, String>> result = new ArrayList<>();
+        for (Map<String, Object> map : source) {
+            Map<String, String> stringMap = new LinkedHashMap<>();
+            for (Map.Entry<String, Object> entry : map.entrySet()) {
+                stringMap.put(entry.getKey(), entry.getValue() != null ? entry.getValue().toString() : "");
+            }
+            result.add(stringMap);
+        }
+        return result;
     }
 
     private Long getLong(Object value) {
