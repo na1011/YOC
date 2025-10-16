@@ -4,17 +4,16 @@ import com.yoc.wms.mail.config.MailConfig;
 import com.yoc.wms.mail.exception.ValueChainException;
 import com.yoc.wms.mail.domain.MailSection;
 import com.yoc.wms.mail.enums.SectionType;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.Before;
+import org.junit.Test;
+import org.junit.runner.RunWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.runners.MockitoJUnitRunner;
 
 import java.util.*;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
 
 /**
@@ -26,8 +25,8 @@ import static org.mockito.Mockito.*;
  * - HTML 이스케이프 검증
  * - 엣지케이스 (null, empty)
  */
-@ExtendWith(MockitoExtension.class)
-class MailBodyRendererTest {
+@RunWith(MockitoJUnitRunner.class)
+public class MailBodyRendererTest {
 
     @Mock
     private MailConfig mailConfig;
@@ -35,28 +34,27 @@ class MailBodyRendererTest {
     @InjectMocks
     private MailBodyRenderer renderer;
 
-    @BeforeEach
-    void setUp() {
-        // MailConfig 기본값 설정 (lenient)
-        lenient().when(mailConfig.getSectionMargin()).thenReturn("margin: 16px 0;");
-        lenient().when(mailConfig.getTitleStyle()).thenReturn("font-size: 18px; font-weight: bold; margin-bottom: 8px;");
-        lenient().when(mailConfig.getDefaultFontStyle()).thenReturn("font-family: Arial, sans-serif;");
-        lenient().when(mailConfig.getDefaultFontSize()).thenReturn("14px");
-        lenient().when(mailConfig.getDefaultPadding()).thenReturn("8px");
-        lenient().when(mailConfig.getTableBorderColor()).thenReturn("#ddd");
-        lenient().when(mailConfig.getTableHeaderBgColor()).thenReturn("#f5f5f5");
-        lenient().when(mailConfig.getTableHeaderTextColor()).thenReturn("#333");
-        lenient().when(mailConfig.getTableStripedBgColor()).thenReturn("#fafafa");
-        lenient().when(mailConfig.getDividerHeight()).thenReturn("1px");
-        lenient().when(mailConfig.getDividerColor()).thenReturn("#ddd");
-        lenient().when(mailConfig.getDividerMargin()).thenReturn("16px 0");
+    @Before
+    public void setUp() {
+        // MailConfig 기본값 설정
+        when(mailConfig.getSectionMargin()).thenReturn("margin: 16px 0;");
+        when(mailConfig.getTitleStyle()).thenReturn("font-size: 18px; font-weight: bold; margin-bottom: 8px;");
+        when(mailConfig.getDefaultFontStyle()).thenReturn("font-family: Arial, sans-serif;");
+        when(mailConfig.getDefaultFontSize()).thenReturn("14px");
+        when(mailConfig.getDefaultPadding()).thenReturn("8px");
+        when(mailConfig.getTableBorderColor()).thenReturn("#ddd");
+        when(mailConfig.getTableHeaderBgColor()).thenReturn("#f5f5f5");
+        when(mailConfig.getTableHeaderTextColor()).thenReturn("#333");
+        when(mailConfig.getTableStripedBgColor()).thenReturn("#fafafa");
+        when(mailConfig.getDividerHeight()).thenReturn("1px");
+        when(mailConfig.getDividerColor()).thenReturn("#ddd");
+        when(mailConfig.getDividerMargin()).thenReturn("16px 0");
     }
 
     // ==================== renderWithStructure() 테스트 ====================
 
     @Test
-    @DisplayName("renderWithStructure: 완전한 HTML 문서 구조 생성")
-    void renderWithStructure_fullDocument() {
+    public void renderWithStructure_fullDocument() {
         // Given
         List<MailSection> sections = Collections.singletonList(
             MailSection.builder().type(SectionType.TEXT).content("테스트 내용").build()
@@ -78,8 +76,7 @@ class MailBodyRendererTest {
     }
 
     @Test
-    @DisplayName("renderWithStructure: systemTitle HTML 이스케이프")
-    void renderWithStructure_escapeSystemTitle() {
+    public void renderWithStructure_escapeSystemTitle() {
         // Given
         List<MailSection> sections = Collections.singletonList(
             MailSection.builder().type(SectionType.TEXT).content("내용").build()
@@ -94,8 +91,8 @@ class MailBodyRendererTest {
     }
 
     @Test
-    @DisplayName("renderWithStructure: footerMessage HTML 이스케이프")
-    void renderWithStructure_escapeFooterMessage() {
+    
+    public void renderWithStructure_escapeFooterMessage() {
         // Given
         List<MailSection> sections = Collections.singletonList(
             MailSection.builder().type(SectionType.TEXT).content("내용").build()
@@ -110,8 +107,8 @@ class MailBodyRendererTest {
     }
 
     @Test
-    @DisplayName("renderWithStructure: 여러 섹션 포함")
-    void renderWithStructure_multipleSections() {
+    
+    public void renderWithStructure_multipleSections() {
         // Given
         List<MailSection> sections = Arrays.asList(
             MailSection.builder().type(SectionType.TEXT).content("A").build(),
@@ -129,8 +126,8 @@ class MailBodyRendererTest {
     }
 
     @Test
-    @DisplayName("renderWithStructure: 빈 섹션 - body는 비어있지만 구조는 유지")
-    void renderWithStructure_emptySections() {
+    
+    public void renderWithStructure_emptySections() {
         // When
         String html = renderer.renderWithStructure(Collections.emptyList(), "Title", "Footer");
 
@@ -143,8 +140,8 @@ class MailBodyRendererTest {
     // ==================== render() 통합 테스트 ====================
 
     @Test
-    @DisplayName("render: 여러 섹션 렌더링")
-    void render_multipleSections() {
+    
+    public void render_multipleSections() {
         // Given
         List<MailSection> sections = Arrays.asList(
             MailSection.builder().type(SectionType.TEXT).content("A").build(),
@@ -163,8 +160,8 @@ class MailBodyRendererTest {
     }
 
     @Test
-    @DisplayName("render: null 섹션 - 빈 문자열 반환")
-    void render_nullSections() {
+    
+    public void render_nullSections() {
         // When
         String html = renderer.render(null);
 
@@ -173,8 +170,8 @@ class MailBodyRendererTest {
     }
 
     @Test
-    @DisplayName("render: 빈 섹션 리스트 - 빈 문자열 반환")
-    void render_emptySections() {
+    
+    public void render_emptySections() {
         // When
         String html = renderer.render(Collections.emptyList());
 
@@ -185,8 +182,8 @@ class MailBodyRendererTest {
     // ==================== renderText() 테스트 ====================
 
     @Test
-    @DisplayName("renderText: 제목 + 내용")
-    void renderText_withTitle() {
+    
+    public void renderText_withTitle() {
         // Given
         MailSection section = MailSection.builder()
             .type(SectionType.TEXT)
@@ -204,8 +201,8 @@ class MailBodyRendererTest {
     }
 
     @Test
-    @DisplayName("renderText: 제목 없음")
-    void renderText_withoutTitle() {
+    
+    public void renderText_withoutTitle() {
         // Given
         MailSection section = MailSection.builder()
             .type(SectionType.TEXT)
@@ -220,8 +217,8 @@ class MailBodyRendererTest {
     }
 
     @Test
-    @DisplayName("renderText: 줄바꿈 변환 (\\n → <br>)")
-    void renderText_newlineConversion() {
+    
+    public void renderText_newlineConversion() {
         // Given
         MailSection section = MailSection.builder()
             .type(SectionType.TEXT)
@@ -237,8 +234,8 @@ class MailBodyRendererTest {
     }
 
     @Test
-    @DisplayName("renderText: 메타데이터 적용 (fontSize, textAlign)")
-    void renderText_withMetadata() {
+    
+    public void renderText_withMetadata() {
         // Given
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("fontSize", "20px");
@@ -263,8 +260,8 @@ class MailBodyRendererTest {
     // ==================== renderTable() 테스트 ====================
 
     @Test
-    @DisplayName("renderTable: 기본 테이블 렌더링")
-    void renderTable_basic() {
+    
+    public void renderTable_basic() {
         // Given
         List<Map<String, String>> data = Arrays.asList(
             createMap("name", "홍길동", "age", "30"),
@@ -289,8 +286,8 @@ class MailBodyRendererTest {
     }
 
     @Test
-    @DisplayName("renderTable: 제목 포함")
-    void renderTable_withTitle() {
+    
+    public void renderTable_withTitle() {
         // Given
         List<Map<String, String>> data = Collections.singletonList(
             createMap("id", "1")
@@ -309,8 +306,8 @@ class MailBodyRendererTest {
     }
 
     @Test
-    @DisplayName("renderTable: bordered=false - 테두리 없음")
-    void renderTable_noBorder() {
+    
+    public void renderTable_noBorder() {
         // Given
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("bordered", "false");
@@ -332,8 +329,8 @@ class MailBodyRendererTest {
     }
 
     @Test
-    @DisplayName("renderTable: striped=true - 줄무늬 배경")
-    void renderTable_striped() {
+    
+    public void renderTable_striped() {
         // Given
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("striped", "true");
@@ -357,8 +354,8 @@ class MailBodyRendererTest {
     }
 
     @Test
-    @DisplayName("renderTable: 헤더 색상 커스터마이징")
-    void renderTable_customHeaderColors() {
+    
+    public void renderTable_customHeaderColors() {
         // Given
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("headerBgColor", "#ff0000");
@@ -381,24 +378,21 @@ class MailBodyRendererTest {
         assertTrue(html.contains("color: #ffffff"));
     }
 
-    @Test
-    @DisplayName("renderTable: 빈 데이터 - 빌드 시 예외 발생")
-    void renderTable_emptyData() {
+    @Test(expected = ValueChainException.class)
+    public void renderTable_emptyData() {
         // When & Then
         // validate()에서 예외 발생 (TABLE type requires data)
-        assertThrows(ValueChainException.class, () ->
-            MailSection.builder()
-                .type(SectionType.TABLE)
-                .data(Collections.emptyList())
-                .build()
-        );
+        MailSection.builder()
+            .type(SectionType.TABLE)
+            .data(Collections.<Map<String, String>>emptyList())
+            .build();
     }
 
     // ==================== renderHtml() 테스트 ====================
 
     @Test
-    @DisplayName("renderHtml: HTML 그대로 출력")
-    void renderHtml_rawHtml() {
+    
+    public void renderHtml_rawHtml() {
         // Given
         MailSection section = MailSection.builder()
             .type(SectionType.HTML)
@@ -413,8 +407,8 @@ class MailBodyRendererTest {
     }
 
     @Test
-    @DisplayName("renderHtml: 제목 포함")
-    void renderHtml_withTitle() {
+    
+    public void renderHtml_withTitle() {
         // Given
         MailSection section = MailSection.builder()
             .type(SectionType.HTML)
@@ -433,8 +427,8 @@ class MailBodyRendererTest {
     // ==================== renderDivider() 테스트 ====================
 
     @Test
-    @DisplayName("renderDivider: 기본 구분선")
-    void renderDivider_basic() {
+    
+    public void renderDivider_basic() {
         // Given
         MailSection section = MailSection.builder()
             .type(SectionType.DIVIDER)
@@ -449,8 +443,8 @@ class MailBodyRendererTest {
     }
 
     @Test
-    @DisplayName("renderDivider: 메타데이터로 스타일 커스터마이징")
-    void renderDivider_customStyle() {
+    
+    public void renderDivider_customStyle() {
         // Given
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("height", "3px");
@@ -473,8 +467,8 @@ class MailBodyRendererTest {
     // ==================== HTML 이스케이프 테스트 ====================
 
     @Test
-    @DisplayName("HTML 이스케이프: 특수문자 변환")
-    void escapeHtml_specialCharacters() {
+    
+    public void escapeHtml_specialCharacters() {
         // Given
         MailSection section = MailSection.builder()
             .type(SectionType.TEXT)
@@ -490,8 +484,8 @@ class MailBodyRendererTest {
     }
 
     @Test
-    @DisplayName("HTML 이스케이프: &, <, >, \", ' 변환")
-    void escapeHtml_allSpecialChars() {
+    
+    public void escapeHtml_allSpecialChars() {
         // Given
         MailSection section = MailSection.builder()
             .type(SectionType.TEXT)
@@ -510,8 +504,8 @@ class MailBodyRendererTest {
     }
 
     @Test
-    @DisplayName("HTML 이스케이프: 테이블 헤더/데이터")
-    void escapeHtml_inTable() {
+    
+    public void escapeHtml_inTable() {
         // Given
         List<Map<String, String>> data = Collections.singletonList(
             createMap("<name>", "<value>")
@@ -530,8 +524,8 @@ class MailBodyRendererTest {
     }
 
     @Test
-    @DisplayName("HTML 이스케이프: null 안전 처리")
-    void escapeHtml_null() {
+    
+    public void escapeHtml_null() {
         // Given
         MailSection section = MailSection.builder()
             .type(SectionType.TEXT)
@@ -550,16 +544,16 @@ class MailBodyRendererTest {
     // ==================== 엣지케이스 테스트 ====================
 
     @Test
-    @DisplayName("엣지케이스: 알 수 없는 SectionType")
-    void unknownSectionType() {
+    
+    public void unknownSectionType() {
         // Given - 리플렉션으로 강제 생성 (실제로는 불가능)
         // 현재 코드는 enum으로 모든 타입이 정의되어 있어 테스트 불가
         // switch default 분기는 사실상 도달 불가능
     }
 
     @Test
-    @DisplayName("엣지케이스: 테이블 단일 행")
-    void table_singleRow() {
+    
+    public void table_singleRow() {
         // Given
         List<Map<String, String>> data = Collections.singletonList(
             createMap("key", "value")
@@ -578,8 +572,8 @@ class MailBodyRendererTest {
     }
 
     @Test
-    @DisplayName("엣지케이스: 테이블 다수 컬럼")
-    void table_multipleColumns() {
+    
+    public void table_multipleColumns() {
         // Given
         Map<String, String> row = new LinkedHashMap<>();
         row.put("col1", "v1");
@@ -601,10 +595,13 @@ class MailBodyRendererTest {
     }
 
     @Test
-    @DisplayName("엣지케이스: 매우 긴 텍스트")
-    void text_veryLong() {
+    public void text_veryLong() {
         // Given
-        String longText = "A".repeat(10000);
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 10000; i++) {
+            sb.append("A");
+        }
+        String longText = sb.toString();
         MailSection section = MailSection.builder()
             .type(SectionType.TEXT)
             .content(longText)
@@ -620,8 +617,8 @@ class MailBodyRendererTest {
     // ==================== forContact() Factory Method 테스트 ====================
 
     @Test
-    @DisplayName("forContact: 섹션 구조 - DIVIDER + TEXT")
-    void forContact_sectionStructure() {
+    
+    public void forContact_sectionStructure() {
         // Given
         String contactInfo = "IT: it@company.com";
 
@@ -638,8 +635,8 @@ class MailBodyRendererTest {
     }
 
     @Test
-    @DisplayName("forContact: HTML 렌더링 - 구분선 + 문의 섹션")
-    void forContact_htmlRendering() {
+    
+    public void forContact_htmlRendering() {
         // Given
         String contactInfo = "IT: it@company.com";
         List<MailSection> sections = MailSection.forContact(contactInfo);
@@ -654,8 +651,8 @@ class MailBodyRendererTest {
     }
 
     @Test
-    @DisplayName("forContact: 줄바꿈 변환 - contact 1~3 모두 있을 때")
-    void forContact_multipleContacts() {
+    
+    public void forContact_multipleContacts() {
         // Given
         String contactInfo = "IT: it@company.com\nHR: hr@company.com\n법무: legal@company.com";
         List<MailSection> sections = MailSection.forContact(contactInfo);
@@ -675,8 +672,8 @@ class MailBodyRendererTest {
     }
 
     @Test
-    @DisplayName("forContact: contact 1만 있을 때 - 줄바꿈 없음")
-    void forContact_singleContact() {
+    
+    public void forContact_singleContact() {
         // Given
         String contactInfo = "IT Support: support@company.com";
         List<MailSection> sections = MailSection.forContact(contactInfo);
@@ -691,8 +688,8 @@ class MailBodyRendererTest {
     }
 
     @Test
-    @DisplayName("forContact: HTML 이스케이프 - 특수문자 포함")
-    void forContact_htmlEscape() {
+    
+    public void forContact_htmlEscape() {
         // Given
         String contactInfo = "IT: <admin@company.com> & Support";
         List<MailSection> sections = MailSection.forContact(contactInfo);

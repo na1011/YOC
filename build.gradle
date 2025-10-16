@@ -25,13 +25,39 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
     runtimeOnly 'com.h2database:h2'
-    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+
+    // ==================== Test Dependencies ====================
+    // JUnit 4.12 + Mockito 2.23.0
+    //
+    // [개발 환경] Spring Boot + Mockito 2.23.0
+    //   - 단위 테스트 (193개): Mockito 1.10.19 API 사용 → 운영 호환
+    //   - 통합 테스트 (28개): @MockBean 사용 → 개발 전용
+    //
+    // [운영 환경] Spring 3.1.2 + Mockito 1.10.19
+    //   - 단위 테스트만 복사하여 실행 (통합 테스트 제외)
+    //   - build.gradle에서 mockito-core:1.10.19로 변경 필요
+    //
+    testImplementation 'junit:junit:4.12'
+    testImplementation 'org.mockito:mockito-core:2.23.0'
+    testImplementation('org.springframework.boot:spring-boot-starter-test') {
+        exclude group: 'org.junit.jupiter'
+        exclude group: 'org.mockito', module: 'mockito-junit-jupiter'
+    }
     testImplementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter-test:3.0.5'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 tasks.named('test') {
-    useJUnitPlatform()
+    useJUnit()  // JUnit 4 사용
+
+    // Mockito 1.10.19 + Java 17 호환성: 모듈 시스템 우회
+    // 프로덕션(Java 8)에서는 불필요하지만, 개발 환경(Java 17)에서 테스트 실행을 위해 필요
+    jvmArgs(
+        '--add-opens', 'java.base/java.lang=ALL-UNNAMED',
+        '--add-opens', 'java.base/java.lang.reflect=ALL-UNNAMED',
+        '--add-opens', 'java.base/java.io=ALL-UNNAMED',
+        '--add-opens', 'java.base/java.util=ALL-UNNAMED'
+    )
+
     // 테스트 로그 출력
     testLogging {
         events "passed", "skipped", "failed"

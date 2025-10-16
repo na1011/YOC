@@ -2,10 +2,13 @@ package com.yoc.wms.mail.integration;
 
 import com.yoc.wms.mail.dao.MailDao;
 import com.yoc.wms.mail.service.AlarmMailService;
-import org.junit.jupiter.api.*;
+import org.junit.*;
+import org.junit.runner.RunWith;
+import org.junit.runners.MethodSorters;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -19,11 +22,12 @@ import java.util.concurrent.TimeUnit;
  * 2. WARNING 알람 (재고 부족)
  * 3. INFO 알람 (시스템 공지)
  */
+@RunWith(SpringJUnit4ClassRunner.class)
 @SpringBootTest
 @ActiveProfiles("integration")
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-@Disabled("실제 메일 발송 테스트 - 필요 시 @Disabled 제거 후 실행")
-class AlarmMailServiceRealSendTest {
+@FixMethodOrder(MethodSorters.NAME_ASCENDING)
+@Ignore("실제 메일 발송 테스트 - 필요 시 @Ignore 제거 후 실행")
+public class AlarmMailServiceRealSendTest {
 
     @Autowired
     private AlarmMailService alarmMailService;
@@ -31,8 +35,8 @@ class AlarmMailServiceRealSendTest {
     @Autowired
     private MailDao mailDao;
 
-    @BeforeEach
-    void setUp() {
+    @Before
+    public void setUp() {
         // 큐 초기화
         mailDao.delete("alarm.deleteAllQueue", null);
 
@@ -42,8 +46,8 @@ class AlarmMailServiceRealSendTest {
         System.out.println("========================================\n");
     }
 
-    @AfterEach
-    void tearDown() throws InterruptedException {
+    @After
+    public void tearDown() throws InterruptedException {
         // 비동기 처리 완료 대기
         System.out.println("\n메일 발송 완료 대기 중 (5초)...\n");
         TimeUnit.SECONDS.sleep(5);
@@ -53,9 +57,7 @@ class AlarmMailServiceRealSendTest {
     // ==================== 시나리오 1: CRITICAL 알람 (지연 주문) ====================
 
     @Test
-    @Order(1)
-    @DisplayName("실제 발송 1: CRITICAL 알람 - 지연 주문")
-    void realSend1_criticalAlarm_overdueOrders() throws InterruptedException {
+    public void test01_realSend1_criticalAlarm_overdueOrders() throws InterruptedException {
         System.out.println("\n[실제 발송 1] CRITICAL 알람 - 지연 주문");
 
         // Given - Producer 시뮬레이션: CRITICAL 알람 삽입
@@ -96,9 +98,7 @@ class AlarmMailServiceRealSendTest {
     // ==================== 시나리오 2: WARNING 알람 (재고 부족) ====================
 
     @Test
-    @Order(2)
-    @DisplayName("실제 발송 2: WARNING 알람 - 재고 부족")
-    void realSend2_warningAlarm_lowStock() throws InterruptedException {
+    public void test02_realSend2_warningAlarm_lowStock() throws InterruptedException {
         System.out.println("\n[실제 발송 2] WARNING 알람 - 재고 부족");
 
         // Given
@@ -137,9 +137,7 @@ class AlarmMailServiceRealSendTest {
     // ==================== 시나리오 3: INFO 알람 (시스템 공지) ====================
 
     @Test
-    @Order(3)
-    @DisplayName("실제 발송 3: INFO 알람 - 시스템 공지")
-    void realSend3_infoAlarm_systemNotice() throws InterruptedException {
+    public void test03_realSend3_infoAlarm_systemNotice() throws InterruptedException {
         System.out.println("\n[실제 발송 3] INFO 알람 - 시스템 공지");
 
         // Given - 테이블 데이터 없는 텍스트만 알람
@@ -181,9 +179,7 @@ class AlarmMailServiceRealSendTest {
     // ==================== 시나리오 4: 복수 섹션 알람 (텍스트 + 테이블 + 텍스트) ====================
 
     @Test
-    @Order(4)
-    @DisplayName("실제 발송 4: 복수 섹션 - 실제 큐 처리 시뮬레이션")
-    void realSend4_multiSection_fullSimulation() throws InterruptedException {
+    public void test04_realSend4_multiSection_fullSimulation() throws InterruptedException {
         System.out.println("\n[실제 발송 4] 복수 알람 동시 발송 (배치 처리)");
 
         // Given - 서로 다른 3개의 알람 동시 삽입 (실제 운영환경 시뮬레이션)
@@ -226,9 +222,7 @@ class AlarmMailServiceRealSendTest {
     // ==================== 최종 확인 메시지 ====================
 
     @Test
-    @Order(5)
-    @DisplayName("실제 발송 완료: 전체 요약")
-    void realSend5_summary() {
+    public void test05_realSend5_summary() {
         System.out.println("\n========================================");
         System.out.println("✅ AlarmMailService 실제 발송 테스트 완료");
         System.out.println("========================================");

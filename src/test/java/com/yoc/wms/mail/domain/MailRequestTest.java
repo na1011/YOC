@@ -1,12 +1,11 @@
 package com.yoc.wms.mail.domain;
 
 import com.yoc.wms.mail.exception.ValueChainException;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.junit.Test;
 
 import java.util.*;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.Assert.*;
 
 /**
  * MailRequest 단위 테스트
@@ -17,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * - 엣지케이스 (빈 리스트, null)
  * - Subject 생성 로직
  */
-class MailRequestTest {
+public class MailRequestTest {
 
     private static final Recipient TEST_RECIPIENT = Recipient.builder()
         .userId("test")
@@ -27,8 +26,7 @@ class MailRequestTest {
     // ==================== Builder + Helper Methods 테스트 ====================
 
     @Test
-    @DisplayName("Builder + Helper: 정상 생성 - 알람 메일 (테이블 데이터 포함)")
-    void builderHelper_alarm_withTable() {
+    public void builderHelper_alarm_withTable() {
         // Given
         String title = "지연 주문 알림";
         String content = "10건의 지연 주문이 발견되었습니다.";
@@ -61,8 +59,7 @@ class MailRequestTest {
     }
 
     @Test
-    @DisplayName("Builder + Helper: 알람 메일 - 테이블 데이터 없음")
-    void builderHelper_alarm_withoutTable() {
+    public void builderHelper_alarm_withoutTable() {
         // Given
         String title = "시스템 알림";
         String content = "정상 처리";
@@ -84,8 +81,7 @@ class MailRequestTest {
     }
 
     @Test
-    @DisplayName("Builder + Helper: CRITICAL 심각도 - 제목 [긴급] 접두사")
-    void builderHelper_criticalSeverity() {
+    public void builderHelper_criticalSeverity() {
         // Given
         String title = "재고 부족";
         String content = "긴급 처리 필요";
@@ -106,8 +102,7 @@ class MailRequestTest {
     }
 
     @Test
-    @DisplayName("Builder + Helper: WARNING 심각도 - 제목 [경고] 접두사")
-    void builderHelper_warningSeverity() {
+    public void builderHelper_warningSeverity() {
         // Given
         String title = "품질 이슈";
         String content = "확인 필요";
@@ -128,8 +123,7 @@ class MailRequestTest {
     }
 
     @Test
-    @DisplayName("Builder + Helper: 공지 메일 생성")
-    void builderHelper_notice() {
+    public void builderHelper_notice() {
         // Given
         String title = "시스템 점검 안내";
         String content = "12월 1일 점검 예정입니다.";
@@ -151,8 +145,7 @@ class MailRequestTest {
     }
 
     @Test
-    @DisplayName("Builder + Helper: 보고서 메일 생성 - 테이블 포함")
-    void builderHelper_report_withTable() {
+    public void builderHelper_report_withTable() {
         // Given
         String reportTitle = "일일 처리 현황";
         String description = "최근 처리 건수";
@@ -178,8 +171,7 @@ class MailRequestTest {
     }
 
     @Test
-    @DisplayName("Builder + Helper: 보고서 메일 생성 - 테이블 없음")
-    void builderHelper_report_withoutTable() {
+    public void builderHelper_report_withoutTable() {
         // Given
         String reportTitle = "요약 보고";
         String description = "특이사항 없음";
@@ -198,8 +190,7 @@ class MailRequestTest {
     }
 
     @Test
-    @DisplayName("Builder + Helper: 단순 텍스트 메일 생성")
-    void builderHelper_simpleText() {
+    public void builderHelper_simpleText() {
         // Given
         String subject = "테스트 메일";
         String title = "안내";
@@ -222,8 +213,7 @@ class MailRequestTest {
     // ==================== Builder 패턴 테스트 ====================
 
     @Test
-    @DisplayName("Builder: 정상 생성 - 모든 필드 설정")
-    void builder_allFields() {
+    public void builder_allFields() {
         // Given
         Recipient ccRecipient = Recipient.builder()
             .userId("cc")
@@ -251,8 +241,7 @@ class MailRequestTest {
     }
 
     @Test
-    @DisplayName("Builder: CC 없음")
-    void builder_noCc() {
+    public void builder_noCc() {
         // When
         MailRequest request = MailRequest.builder()
             .subject("제목")
@@ -267,8 +256,7 @@ class MailRequestTest {
     }
 
     @Test
-    @DisplayName("Builder: mailType 기본값 DIRECT")
-    void builder_defaultMailType() {
+    public void builder_defaultMailType() {
         // When
         MailRequest request = MailRequest.builder()
             .subject("제목")
@@ -281,8 +269,7 @@ class MailRequestTest {
     }
 
     @Test
-    @DisplayName("Builder: addDivider - 구분선 추가")
-    void builder_addDivider() {
+    public void builder_addDivider() {
         // When
         MailRequest request = MailRequest.builder()
             .subject("제목")
@@ -297,8 +284,7 @@ class MailRequestTest {
     }
 
     @Test
-    @DisplayName("Builder: 복수 섹션 조합")
-    void builder_multipleSections() {
+    public void builder_multipleSections() {
         // Given
         List<Map<String, String>> tableData = Collections.singletonList(
             createMap("key", "value")
@@ -321,91 +307,97 @@ class MailRequestTest {
     // ==================== 검증 로직 테스트 ====================
 
     @Test
-    @DisplayName("검증 실패: subject가 null")
-    void validation_nullSubject() {
+    public void validation_nullSubject() {
         // When & Then
-        ValueChainException ex = assertThrows(ValueChainException.class, () ->
+        try {
             MailRequest.builder()
                 .addDivider()
                 .addRecipient(TEST_RECIPIENT)
-                .build()
-        );
-        assertTrue(ex.getMessage().contains("Subject is required"));
+                .build();
+            fail("Expected ValueChainException");
+        } catch (ValueChainException ex) {
+            assertTrue(ex.getMessage().contains("Subject is required"));
+        }
     }
 
     @Test
-    @DisplayName("검증 실패: subject가 빈 문자열")
-    void validation_emptySubject() {
+    public void validation_emptySubject() {
         // When & Then
-        ValueChainException ex = assertThrows(ValueChainException.class, () ->
+        try {
             MailRequest.builder()
                 .subject("")
                 .addDivider()
                 .addRecipient(TEST_RECIPIENT)
-                .build()
-        );
-        assertTrue(ex.getMessage().contains("Subject is required"));
+                .build();
+            fail("Expected ValueChainException");
+        } catch (ValueChainException ex) {
+            assertTrue(ex.getMessage().contains("Subject is required"));
+        }
     }
 
     @Test
-    @DisplayName("검증 실패: subject가 공백")
-    void validation_blankSubject() {
+    public void validation_blankSubject() {
         // When & Then
-        assertThrows(ValueChainException.class, () ->
+        try {
             MailRequest.builder()
                 .subject("   ")
                 .addDivider()
                 .addRecipient(TEST_RECIPIENT)
-                .build()
-        );
+                .build();
+            fail("Expected ValueChainException");
+        } catch (ValueChainException ex) {
+            // Exception caught successfully
+        }
     }
 
     @Test
-    @DisplayName("검증 실패: sections가 빈 리스트")
-    void validation_emptySections() {
+    public void validation_emptySections() {
         // When & Then
-        ValueChainException ex = assertThrows(ValueChainException.class, () ->
+        try {
             MailRequest.builder()
                 .subject("제목")
                 .addRecipient(TEST_RECIPIENT)
-                .build()
-        );
-        assertTrue(ex.getMessage().contains("At least one section is required"));
+                .build();
+            fail("Expected ValueChainException");
+        } catch (ValueChainException ex) {
+            assertTrue(ex.getMessage().contains("At least one section is required"));
+        }
     }
 
     @Test
-    @DisplayName("검증 실패: recipients가 null")
-    void validation_nullRecipients() {
+    public void validation_nullRecipients() {
         // When & Then
-        ValueChainException ex = assertThrows(ValueChainException.class, () ->
+        try {
             MailRequest.builder()
                 .subject("제목")
                 .addDivider()
                 .recipients(null)
-                .build()
-        );
-        assertTrue(ex.getMessage().contains("At least one recipient is required"));
+                .build();
+            fail("Expected ValueChainException");
+        } catch (ValueChainException ex) {
+            assertTrue(ex.getMessage().contains("At least one recipient is required"));
+        }
     }
 
     @Test
-    @DisplayName("검증 실패: recipients가 빈 리스트")
-    void validation_emptyRecipients() {
+    public void validation_emptyRecipients() {
         // When & Then
-        ValueChainException ex = assertThrows(ValueChainException.class, () ->
+        try {
             MailRequest.builder()
                 .subject("제목")
                 .addDivider()
-                .recipients(Collections.emptyList())
-                .build()
-        );
-        assertTrue(ex.getMessage().contains("At least one recipient is required"));
+                .recipients(Collections.<Recipient>emptyList())
+                .build();
+            fail("Expected ValueChainException");
+        } catch (ValueChainException ex) {
+            assertTrue(ex.getMessage().contains("At least one recipient is required"));
+        }
     }
 
     // ==================== Subject 생성 로직 테스트 ====================
 
     @Test
-    @DisplayName("Helper: alarmSubject - CRITICAL + 0건")
-    void helper_alarmSubject_critical_zeroCount() {
+    public void helper_alarmSubject_critical_zeroCount() {
         // When
         String subject = MailRequest.alarmSubject("알림", "CRITICAL", 0);
 
@@ -414,8 +406,7 @@ class MailRequestTest {
     }
 
     @Test
-    @DisplayName("Helper: alarmSubject - WARNING + 여러 건")
-    void helper_alarmSubject_warning_multipleCount() {
+    public void helper_alarmSubject_warning_multipleCount() {
         // When
         String subject = MailRequest.alarmSubject("지연 주문", "WARNING", 3);
 
@@ -424,8 +415,7 @@ class MailRequestTest {
     }
 
     @Test
-    @DisplayName("Helper: alarmSubject - INFO 심각도")
-    void helper_alarmSubject_info() {
+    public void helper_alarmSubject_info() {
         // When
         String subject = MailRequest.alarmSubject("정보", "INFO", 0);
 
@@ -434,8 +424,7 @@ class MailRequestTest {
     }
 
     @Test
-    @DisplayName("Helper: alarmTitle - 심각도별 아이콘")
-    void helper_alarmTitle() {
+    public void helper_alarmTitle() {
         // When & Then
         assertTrue(MailRequest.alarmTitle("제목", "CRITICAL").contains("🔴"));
         assertTrue(MailRequest.alarmTitle("제목", "WARNING").contains("⚠️"));
@@ -443,8 +432,7 @@ class MailRequestTest {
     }
 
     @Test
-    @DisplayName("Helper: noticeTitle - 아이콘 포함")
-    void helper_noticeTitle() {
+    public void helper_noticeTitle() {
         // When
         String title = MailRequest.noticeTitle("시스템 점검");
 
@@ -454,8 +442,7 @@ class MailRequestTest {
     }
 
     @Test
-    @DisplayName("Helper: reportTitle - 아이콘 포함")
-    void helper_reportTitle() {
+    public void helper_reportTitle() {
         // When
         String title = MailRequest.reportTitle("월간 보고서");
 
@@ -467,7 +454,7 @@ class MailRequestTest {
     // ==================== Helper Methods ====================
 
     private Map<String, String> createMap(String... keyValues) {
-        Map<String, String> map = new HashMap<>();
+        Map<String, String> map = new HashMap<String, String>();
         for (int i = 0; i < keyValues.length; i += 2) {
             map.put(keyValues[i], keyValues[i + 1]);
         }

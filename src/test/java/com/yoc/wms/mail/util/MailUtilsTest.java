@@ -2,15 +2,14 @@ package com.yoc.wms.mail.util;
 
 import com.yoc.wms.mail.domain.Recipient;
 import com.yoc.wms.mail.exception.ValueChainException;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.junit.Test;
 
 import java.sql.Clob;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
 
 /**
@@ -22,13 +21,12 @@ import static org.mockito.Mockito.*;
  * - 수신인 검증 (null, empty, 형식 오류, 중복)
  * - 엣지케이스
  */
-class MailUtilsTest {
+public class MailUtilsTest {
 
     // ==================== isValidEmail() 테스트 ====================
 
     @Test
-    @DisplayName("이메일 검증: 정상 형식")
-    void isValidEmail_valid() {
+    public void isValidEmail_valid() {
         assertTrue(MailUtils.isValidEmail("user@company.com"));
         assertTrue(MailUtils.isValidEmail("test.user@company.co.kr"));
         assertTrue(MailUtils.isValidEmail("test+tag@example.com"));
@@ -37,64 +35,54 @@ class MailUtilsTest {
     }
 
     @Test
-    @DisplayName("이메일 검증: 비정상 형식 - @ 없음")
-    void isValidEmail_noAtSign() {
+    public void isValidEmail_noAtSign() {
         assertFalse(MailUtils.isValidEmail("usercompany.com"));
     }
 
     @Test
-    @DisplayName("이메일 검증: 비정상 형식 - 도메인 없음")
-    void isValidEmail_noDomain() {
+    public void isValidEmail_noDomain() {
         assertFalse(MailUtils.isValidEmail("user@"));
         assertFalse(MailUtils.isValidEmail("user@.com"));
     }
 
     @Test
-    @DisplayName("이메일 검증: 비정상 형식 - 로컬파트 없음")
-    void isValidEmail_noLocalPart() {
+    public void isValidEmail_noLocalPart() {
         assertFalse(MailUtils.isValidEmail("@company.com"));
     }
 
     @Test
-    @DisplayName("이메일 검증: 비정상 형식 - TLD 없음")
-    void isValidEmail_noTld() {
+    public void isValidEmail_noTld() {
         assertFalse(MailUtils.isValidEmail("user@company"));
     }
 
     @Test
-    @DisplayName("이메일 검증: 비정상 형식 - 공백 포함")
-    void isValidEmail_withSpaces() {
+    public void isValidEmail_withSpaces() {
         assertFalse(MailUtils.isValidEmail("user @company.com"));
         assertFalse(MailUtils.isValidEmail("user@ company.com"));
     }
 
     @Test
-    @DisplayName("이메일 검증: null")
-    void isValidEmail_null() {
+    public void isValidEmail_null() {
         assertFalse(MailUtils.isValidEmail(null));
     }
 
     @Test
-    @DisplayName("이메일 검증: 빈 문자열")
-    void isValidEmail_empty() {
+    public void isValidEmail_empty() {
         assertFalse(MailUtils.isValidEmail(""));
     }
 
     @Test
-    @DisplayName("이메일 검증: 공백만")
-    void isValidEmail_blank() {
+    public void isValidEmail_blank() {
         assertFalse(MailUtils.isValidEmail("   "));
     }
 
     @Test
-    @DisplayName("이메일 검증: TLD 1글자 - 실패")
-    void isValidEmail_tldTooShort() {
+    public void isValidEmail_tldTooShort() {
         assertFalse(MailUtils.isValidEmail("user@company.c"));
     }
 
     @Test
-    @DisplayName("이메일 검증: 다수 @ 기호")
-    void isValidEmail_multipleAtSigns() {
+    public void isValidEmail_multipleAtSigns() {
         assertFalse(MailUtils.isValidEmail("user@@company.com"));
         assertFalse(MailUtils.isValidEmail("user@test@company.com"));
     }
@@ -102,8 +90,7 @@ class MailUtilsTest {
     // ==================== validateRecipients() 테스트 ====================
 
     @Test
-    @DisplayName("수신인 검증: 정상 케이스")
-    void validateRecipients_valid() {
+    public void validateRecipients_valid() {
         // Given
         List<Recipient> recipients = Arrays.asList(
             Recipient.builder().email("user1@company.com").build(),
@@ -111,92 +98,101 @@ class MailUtilsTest {
         );
 
         // When & Then
-        assertDoesNotThrow(() -> MailUtils.validateRecipients(recipients));
+        try {
+            MailUtils.validateRecipients(recipients);
+        } catch (Exception e) {
+            fail("Should not throw exception");
+        }
     }
 
     @Test
-    @DisplayName("수신인 검증: null 목록")
-    void validateRecipients_null() {
+    public void validateRecipients_null() {
         // When & Then
-        ValueChainException ex = assertThrows(ValueChainException.class,
-            () -> MailUtils.validateRecipients(null)
-        );
-        assertTrue(ex.getMessage().contains("수신인이 없습니다"));
+        try {
+            MailUtils.validateRecipients(null);
+            fail("Expected ValueChainException");
+        } catch (ValueChainException ex) {
+            assertTrue(ex.getMessage().contains("수신인이 없습니다"));
+        }
     }
 
     @Test
-    @DisplayName("수신인 검증: 빈 목록")
-    void validateRecipients_empty() {
+    public void validateRecipients_empty() {
         // When & Then
-        ValueChainException ex = assertThrows(ValueChainException.class,
-            () -> MailUtils.validateRecipients(Collections.emptyList())
-        );
-        assertTrue(ex.getMessage().contains("수신인이 없습니다"));
+        try {
+            MailUtils.validateRecipients(Collections.<Recipient>emptyList());
+            fail("Expected ValueChainException");
+        } catch (ValueChainException ex) {
+            assertTrue(ex.getMessage().contains("수신인이 없습니다"));
+        }
     }
 
     @Test
-    @DisplayName("수신인 검증: 이메일 주소 null")
-    void validateRecipients_nullEmail() {
+    public void validateRecipients_nullEmail() {
         // Given
         List<Recipient> recipients = Collections.singletonList(
             Recipient.builder().userId("user1").email(null).build()
         );
 
         // When & Then
-        ValueChainException ex = assertThrows(ValueChainException.class,
-            () -> MailUtils.validateRecipients(recipients)
-        );
-        assertTrue(ex.getMessage().contains("이메일 주소가 없습니다"));
+        try {
+            MailUtils.validateRecipients(recipients);
+            fail("Expected ValueChainException");
+        } catch (ValueChainException ex) {
+            assertTrue(ex.getMessage().contains("이메일 주소가 없습니다"));
+        }
     }
 
     @Test
-    @DisplayName("수신인 검증: 빈 이메일 주소")
-    void validateRecipients_emptyEmail() {
+    public void validateRecipients_emptyEmail() {
         // Given
         List<Recipient> recipients = Collections.singletonList(
             Recipient.builder().userId("user1").email("").build()
         );
 
         // When & Then
-        ValueChainException ex = assertThrows(ValueChainException.class,
-            () -> MailUtils.validateRecipients(recipients)
-        );
-        assertTrue(ex.getMessage().contains("이메일 주소가 없습니다"));
+        try {
+            MailUtils.validateRecipients(recipients);
+            fail("Expected ValueChainException");
+        } catch (ValueChainException ex) {
+            assertTrue(ex.getMessage().contains("이메일 주소가 없습니다"));
+        }
     }
 
     @Test
-    @DisplayName("수신인 검증: 공백 이메일 주소")
-    void validateRecipients_blankEmail() {
+    public void validateRecipients_blankEmail() {
         // Given
         List<Recipient> recipients = Collections.singletonList(
             Recipient.builder().userId("user1").email("   ").build()
         );
 
         // When & Then
-        ValueChainException ex = assertThrows(ValueChainException.class,
-            () -> MailUtils.validateRecipients(recipients)
-        );
-        assertTrue(ex.getMessage().contains("이메일 주소가 없습니다"));
+        try {
+            MailUtils.validateRecipients(recipients);
+            fail("Expected ValueChainException");
+        } catch (ValueChainException ex) {
+            assertTrue(ex.getMessage().contains("이메일 주소가 없습니다"));
+        }
     }
 
     @Test
-    @DisplayName("수신인 검증: 잘못된 이메일 형식")
-    void validateRecipients_invalidFormat() {
+    public void validateRecipients_invalidFormat() {
         // Given
         List<Recipient> recipients = Collections.singletonList(
             Recipient.builder().email("invalid-email").build()
         );
 
         // When & Then
-        ValueChainException ex = assertThrows(ValueChainException.class,
-            () -> MailUtils.validateRecipients(recipients)
-        );
-        assertTrue(ex.getMessage().contains("잘못된 이메일 형식"));
+        try {
+            MailUtils.validateRecipients(recipients);
+            fail("Expected ValueChainException");
+        } catch (ValueChainException ex) {
+            assertTrue(ex.getMessage().contains("잘못된 이메일 형식"));
+        }
     }
 
     @Test
-    @DisplayName("수신인 검증: 중복된 이메일 (동일)")
-    void validateRecipients_duplicateEmail() {
+    public void validateRecipients_duplicateEmail() {
         // Given
         List<Recipient> recipients = Arrays.asList(
             Recipient.builder().email("user@company.com").build(),
@@ -204,15 +200,16 @@ class MailUtilsTest {
         );
 
         // When & Then
-        ValueChainException ex = assertThrows(ValueChainException.class,
-            () -> MailUtils.validateRecipients(recipients)
-        );
-        assertTrue(ex.getMessage().contains("중복된 이메일"));
+        try {
+            MailUtils.validateRecipients(recipients);
+            fail("Expected ValueChainException");
+        } catch (ValueChainException ex) {
+            assertTrue(ex.getMessage().contains("중복된 이메일"));
+        }
     }
 
     @Test
-    @DisplayName("수신인 검증: 중복된 이메일 (대소문자 차이)")
-    void validateRecipients_duplicateCaseInsensitive() {
+    public void validateRecipients_duplicateCaseInsensitive() {
         // Given
         List<Recipient> recipients = Arrays.asList(
             Recipient.builder().email("User@Company.com").build(),
@@ -220,15 +217,16 @@ class MailUtilsTest {
         );
 
         // When & Then
-        ValueChainException ex = assertThrows(ValueChainException.class,
-            () -> MailUtils.validateRecipients(recipients)
-        );
-        assertTrue(ex.getMessage().contains("중복된 이메일"));
+        try {
+            MailUtils.validateRecipients(recipients);
+            fail("Expected ValueChainException");
+        } catch (ValueChainException ex) {
+            assertTrue(ex.getMessage().contains("중복된 이메일"));
+        }
     }
 
     @Test
-    @DisplayName("수신인 검증: 여러 오류 중 첫 번째만 보고")
-    void validateRecipients_firstErrorOnly() {
+    public void validateRecipients_firstErrorOnly() {
         // Given - null 이메일이 먼저 검증됨
         List<Recipient> recipients = Arrays.asList(
             Recipient.builder().email(null).build(),
@@ -236,17 +234,18 @@ class MailUtilsTest {
         );
 
         // When & Then
-        ValueChainException ex = assertThrows(ValueChainException.class,
-            () -> MailUtils.validateRecipients(recipients)
-        );
-        assertTrue(ex.getMessage().contains("이메일 주소가 없습니다"));
+        try {
+            MailUtils.validateRecipients(recipients);
+            fail("Expected ValueChainException");
+        } catch (ValueChainException ex) {
+            assertTrue(ex.getMessage().contains("이메일 주소가 없습니다"));
+        }
     }
 
     // ==================== convertToString() 테스트 ====================
 
     @Test
-    @DisplayName("CLOB 변환: String 타입 - 그대로 반환")
-    void convertToString_string() {
+    public void convertToString_string() {
         // When
         String result = MailUtils.convertToString("테스트 문자열");
 
@@ -255,8 +254,7 @@ class MailUtilsTest {
     }
 
     @Test
-    @DisplayName("CLOB 변환: null - 빈 문자열 반환")
-    void convertToString_null() {
+    public void convertToString_null() {
         // When
         String result = MailUtils.convertToString(null);
 
@@ -265,8 +263,7 @@ class MailUtilsTest {
     }
 
     @Test
-    @DisplayName("CLOB 변환: Clob 타입 - getSubString() 호출")
-    void convertToString_clob() throws Exception {
+    public void convertToString_clob() throws Exception {
         // Given
         Clob clob = mock(Clob.class);
         when(clob.length()).thenReturn(5L);
@@ -282,8 +279,7 @@ class MailUtilsTest {
     }
 
     @Test
-    @DisplayName("CLOB 변환: Clob 타입 - 빈 CLOB")
-    void convertToString_emptyClob() throws Exception {
+    public void convertToString_emptyClob() throws Exception {
         // Given
         Clob clob = mock(Clob.class);
         when(clob.length()).thenReturn(0L);
@@ -298,22 +294,22 @@ class MailUtilsTest {
     }
 
     @Test
-    @DisplayName("CLOB 변환: Clob 타입 - 변환 실패")
-    void convertToString_clobFails() throws Exception {
+    public void convertToString_clobFails() throws Exception {
         // Given
         Clob clob = mock(Clob.class);
         when(clob.length()).thenThrow(new RuntimeException("DB error"));
 
         // When & Then
-        ValueChainException ex = assertThrows(ValueChainException.class,
-            () -> MailUtils.convertToString(clob)
-        );
-        assertTrue(ex.getMessage().contains("CLOB 변환 실패"));
+        try {
+            MailUtils.convertToString(clob);
+            fail("Expected ValueChainException");
+        } catch (ValueChainException ex) {
+            assertTrue(ex.getMessage().contains("CLOB 변환 실패"));
+        }
     }
 
     @Test
-    @DisplayName("CLOB 변환: 기타 객체 - toString() 호출")
-    void convertToString_otherObject() {
+    public void convertToString_otherObject() {
         // Given
         Integer number = 12345;
 
@@ -325,10 +321,9 @@ class MailUtilsTest {
     }
 
     @Test
-    @DisplayName("CLOB 변환: 긴 CLOB")
-    void convertToString_largeClobContent() throws Exception {
+    public void convertToString_largeClobContent() throws Exception {
         // Given
-        String longText = "A".repeat(100000);
+        String longText = repeatString("A", 100000);
         Clob clob = mock(Clob.class);
         when(clob.length()).thenReturn((long) longText.length());
         when(clob.getSubString(1, longText.length())).thenReturn(longText);
@@ -344,8 +339,7 @@ class MailUtilsTest {
     // ==================== formatRecipientsToString() 테스트 ====================
 
     @Test
-    @DisplayName("수신인 포맷: 정상 케이스")
-    void formatRecipientsToString_valid() {
+    public void formatRecipientsToString_valid() {
         // Given
         List<Recipient> recipients = Arrays.asList(
             Recipient.builder().email("user1@company.com").build(),
@@ -361,8 +355,7 @@ class MailUtilsTest {
     }
 
     @Test
-    @DisplayName("수신인 포맷: 단일 수신인")
-    void formatRecipientsToString_single() {
+    public void formatRecipientsToString_single() {
         // Given
         List<Recipient> recipients = Collections.singletonList(
             Recipient.builder().email("single@company.com").build()
@@ -376,8 +369,7 @@ class MailUtilsTest {
     }
 
     @Test
-    @DisplayName("수신인 포맷: null 목록 - 빈 문자열")
-    void formatRecipientsToString_null() {
+    public void formatRecipientsToString_null() {
         // When
         String result = MailUtils.formatRecipientsToString(null);
 
@@ -386,18 +378,16 @@ class MailUtilsTest {
     }
 
     @Test
-    @DisplayName("수신인 포맷: 빈 목록 - 빈 문자열")
-    void formatRecipientsToString_empty() {
+    public void formatRecipientsToString_empty() {
         // When
-        String result = MailUtils.formatRecipientsToString(Collections.emptyList());
+        String result = MailUtils.formatRecipientsToString(Collections.<Recipient>emptyList());
 
         // Then
         assertEquals("", result);
     }
 
     @Test
-    @DisplayName("수신인 포맷: 많은 수신인")
-    void formatRecipientsToString_many() {
+    public void formatRecipientsToString_many() {
         // Given
         List<Recipient> recipients = Arrays.asList(
             Recipient.builder().email("user1@test.com").build(),
@@ -419,10 +409,9 @@ class MailUtilsTest {
     // ==================== 엣지케이스 테스트 ====================
 
     @Test
-    @DisplayName("엣지케이스: 매우 긴 이메일 주소")
-    void edgeCase_veryLongEmail() {
+    public void edgeCase_veryLongEmail() {
         // Given
-        String localPart = "a".repeat(64); // RFC 5321 최대 로컬파트 길이
+        String localPart = repeatString("a", 64); // RFC 5321 최대 로컬파트 길이
         String email = localPart + "@company.com";
 
         // When & Then
@@ -430,22 +419,19 @@ class MailUtilsTest {
     }
 
     @Test
-    @DisplayName("엣지케이스: 국제화 도메인 (IDN) - 현재 미지원")
-    void edgeCase_idn() {
+    public void edgeCase_idn() {
         // 현재 패턴은 ASCII만 지원
         assertFalse(MailUtils.isValidEmail("user@한글.com"));
     }
 
     @Test
-    @DisplayName("엣지케이스: 특수문자 조합")
-    void edgeCase_specialCharacters() {
+    public void edgeCase_specialCharacters() {
         assertTrue(MailUtils.isValidEmail("user+filter@sub-domain.example.com"));
         assertTrue(MailUtils.isValidEmail("test_user.name@test-domain.co.uk"));
     }
 
     @Test
-    @DisplayName("엣지케이스: CLOB 최대 길이")
-    void edgeCase_maxClobLength() throws Exception {
+    public void edgeCase_maxClobLength() throws Exception {
         // Given
         Clob clob = mock(Clob.class);
         when(clob.length()).thenReturn(Integer.MAX_VALUE - 1L);
@@ -459,6 +445,14 @@ class MailUtilsTest {
     }
 
     // ==================== Helper Methods ====================
+
+    private String repeatString(String str, int count) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < count; i++) {
+            sb.append(str);
+        }
+        return sb.toString();
+    }
 
     private int countOccurrences(String str, String substr) {
         int count = 0;

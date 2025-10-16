@@ -1,11 +1,10 @@
 package com.yoc.wms.mail.domain;
 
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.junit.Test;
 
 import java.util.*;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.Assert.*;
 
 /**
  * Recipient 단위 테스트
@@ -15,13 +14,13 @@ import static org.junit.jupiter.api.Assertions.*;
  * - fromMap() 정상 변환
  * - 엣지케이스 (null, 빈 값)
  */
-class RecipientTest {
+public class RecipientTest {
 
     // ==================== Builder 패턴 테스트 ====================
 
     @Test
-    @DisplayName("Builder: 정상 생성 - 모든 필드")
-    void builder_allFields() {
+    public void builder_allFields() {
+        // Builder: 정상 생성 - 모든 필드
         // When
         Recipient recipient = Recipient.builder()
             .userId("hong123")
@@ -36,8 +35,8 @@ class RecipientTest {
     }
 
     @Test
-    @DisplayName("Builder: 일부 필드만 설정")
-    void builder_partialFields() {
+    public void builder_partialFields() {
+        // Builder: 일부 필드만 설정
         // When
         Recipient recipient = Recipient.builder()
             .userId("user1")
@@ -51,8 +50,8 @@ class RecipientTest {
     }
 
     @Test
-    @DisplayName("Builder: 모든 필드 null")
-    void builder_allNull() {
+    public void builder_allNull() {
+        // Builder: 모든 필드 null
         // When
         Recipient recipient = Recipient.builder().build();
 
@@ -65,10 +64,10 @@ class RecipientTest {
     // ==================== fromMap() 테스트 ====================
 
     @Test
-    @DisplayName("fromMap: 정상 변환 - 모든 필드")
-    void fromMap_allFields() {
+    public void fromMap_allFields() {
+        // fromMap: 정상 변환 - 모든 필드
         // Given
-        Map<String, Object> map = new HashMap<>();
+        Map<String, Object> map = new HashMap<String, Object>();
         map.put("userId", "kim456");
         map.put("email", "kim@company.com");
         map.put("group", "DEV");
@@ -83,10 +82,10 @@ class RecipientTest {
     }
 
     @Test
-    @DisplayName("fromMap: 일부 필드 누락")
-    void fromMap_partialFields() {
+    public void fromMap_partialFields() {
+        // fromMap: 일부 필드 누락
         // Given
-        Map<String, Object> map = new HashMap<>();
+        Map<String, Object> map = new HashMap<String, Object>();
         map.put("userId", "user2");
         map.put("email", "user2@company.com");
 
@@ -100,10 +99,10 @@ class RecipientTest {
     }
 
     @Test
-    @DisplayName("fromMap: 빈 맵")
-    void fromMap_emptyMap() {
+    public void fromMap_emptyMap() {
+        // fromMap: 빈 맵
         // Given
-        Map<String, Object> map = new HashMap<>();
+        Map<String, Object> map = new HashMap<String, Object>();
 
         // When
         Recipient recipient = Recipient.fromMap(map);
@@ -115,10 +114,10 @@ class RecipientTest {
     }
 
     @Test
-    @DisplayName("fromMap: 잘못된 키 이름")
-    void fromMap_wrongKeys() {
+    public void fromMap_wrongKeys() {
+        // fromMap: 잘못된 키 이름
         // Given
-        Map<String, Object> map = new HashMap<>();
+        Map<String, Object> map = new HashMap<String, Object>();
         map.put("user", "wrong");  // 올바른 키는 userId
         map.put("mail", "wrong@test.com");  // 올바른 키는 email
 
@@ -131,10 +130,10 @@ class RecipientTest {
     }
 
     @Test
-    @DisplayName("fromMap: 값이 null")
-    void fromMap_nullValues() {
+    public void fromMap_nullValues() {
+        // fromMap: 값이 null
         // Given
-        Map<String, Object> map = new HashMap<>();
+        Map<String, Object> map = new HashMap<String, Object>();
         map.put("userId", null);
         map.put("email", null);
         map.put("group", null);
@@ -151,8 +150,8 @@ class RecipientTest {
     // ==================== toString() 테스트 ====================
 
     @Test
-    @DisplayName("toString: 정상 출력")
-    void toStringTest() {
+    public void toStringTest() {
+        // toString: 정상 출력
         // Given
         Recipient recipient = Recipient.builder()
             .userId("test")
@@ -170,8 +169,8 @@ class RecipientTest {
     }
 
     @Test
-    @DisplayName("toString: null 필드 포함")
-    void toStringWithNull() {
+    public void toStringWithNull() {
+        // toString: null 필드 포함
         // Given
         Recipient recipient = Recipient.builder()
             .userId("user")
@@ -189,8 +188,8 @@ class RecipientTest {
     // ==================== 엣지케이스 테스트 ====================
 
     @Test
-    @DisplayName("엣지케이스: 빈 문자열")
-    void edgeCase_emptyString() {
+    public void edgeCase_emptyString() {
+        // 엣지케이스: 빈 문자열
         // When
         Recipient recipient = Recipient.builder()
             .userId("")
@@ -205,8 +204,8 @@ class RecipientTest {
     }
 
     @Test
-    @DisplayName("엣지케이스: 공백 문자열")
-    void edgeCase_whitespace() {
+    public void edgeCase_whitespace() {
+        // 엣지케이스: 공백 문자열
         // When
         Recipient recipient = Recipient.builder()
             .userId("   ")
@@ -221,8 +220,8 @@ class RecipientTest {
     }
 
     @Test
-    @DisplayName("엣지케이스: 특수문자 포함")
-    void edgeCase_specialCharacters() {
+    public void edgeCase_specialCharacters() {
+        // 엣지케이스: 특수문자 포함
         // When
         Recipient recipient = Recipient.builder()
             .userId("user@123")
@@ -237,11 +236,17 @@ class RecipientTest {
     }
 
     @Test
-    @DisplayName("엣지케이스: 매우 긴 문자열")
-    void edgeCase_longString() {
+    public void edgeCase_longString() {
+        // 엣지케이스: 매우 긴 문자열
         // Given
-        String longString = "a".repeat(1000);
-        String longStringUpper = "A".repeat(1000);
+        StringBuilder sb1 = new StringBuilder();
+        StringBuilder sb2 = new StringBuilder();
+        for (int i = 0; i < 1000; i++) {
+            sb1.append("a");
+            sb2.append("A");
+        }
+        String longString = sb1.toString();
+        String longStringUpper = sb2.toString();
 
         // When
         Recipient recipient = Recipient.builder()
@@ -259,24 +264,24 @@ class RecipientTest {
     // ==================== fromMapList() 테스트 ====================
 
     @Test
-    @DisplayName("fromMapList: 정상 변환 - 복수 Map")
-    void fromMapList_multipleMaps() {
+    public void fromMapList_multipleMaps() {
+        // fromMapList: 정상 변환 - 복수 Map
         // Given
-        List<Map<String, Object>> maps = new ArrayList<>();
+        List<Map<String, Object>> maps = new ArrayList<Map<String, Object>>();
 
-        Map<String, Object> map1 = new HashMap<>();
+        Map<String, Object> map1 = new HashMap<String, Object>();
         map1.put("userId", "admin");
         map1.put("email", "admin@company.com");
         map1.put("group", "ADM");
         maps.add(map1);
 
-        Map<String, Object> map2 = new HashMap<>();
+        Map<String, Object> map2 = new HashMap<String, Object>();
         map2.put("userId", "user1");
         map2.put("email", "user1@company.com");
         map2.put("group", "USER");
         maps.add(map2);
 
-        Map<String, Object> map3 = new HashMap<>();
+        Map<String, Object> map3 = new HashMap<String, Object>();
         map3.put("userId", "user2");
         map3.put("email", "user2@company.com");
         map3.put("group", "USER");
@@ -296,10 +301,10 @@ class RecipientTest {
     }
 
     @Test
-    @DisplayName("fromMapList: 빈 리스트")
-    void fromMapList_emptyList() {
+    public void fromMapList_emptyList() {
+        // fromMapList: 빈 리스트
         // Given
-        List<Map<String, Object>> maps = new ArrayList<>();
+        List<Map<String, Object>> maps = new ArrayList<Map<String, Object>>();
 
         // When
         List<Recipient> recipients = Recipient.fromMapList(maps);
@@ -310,8 +315,8 @@ class RecipientTest {
     }
 
     @Test
-    @DisplayName("fromMapList: null 리스트")
-    void fromMapList_nullList() {
+    public void fromMapList_nullList() {
+        // fromMapList: null 리스트
         // When
         List<Recipient> recipients = Recipient.fromMapList(null);
 
@@ -321,24 +326,24 @@ class RecipientTest {
     }
 
     @Test
-    @DisplayName("fromMapList: 중복 이메일 제거")
-    void fromMapList_duplicateEmails() {
+    public void fromMapList_duplicateEmails() {
+        // fromMapList: 중복 이메일 제거
         // Given - 동일한 이메일을 가진 다른 사용자
-        List<Map<String, Object>> maps = new ArrayList<>();
+        List<Map<String, Object>> maps = new ArrayList<Map<String, Object>>();
 
-        Map<String, Object> map1 = new HashMap<>();
+        Map<String, Object> map1 = new HashMap<String, Object>();
         map1.put("userId", "admin1");
         map1.put("email", "admin@company.com");
         map1.put("group", "ADM");
         maps.add(map1);
 
-        Map<String, Object> map2 = new HashMap<>();
+        Map<String, Object> map2 = new HashMap<String, Object>();
         map2.put("userId", "admin2");
         map2.put("email", "admin@company.com");  // 동일한 이메일 (중복)
         map2.put("group", "ADM");
         maps.add(map2);
 
-        Map<String, Object> map3 = new HashMap<>();
+        Map<String, Object> map3 = new HashMap<String, Object>();
         map3.put("userId", "user1");
         map3.put("email", "user@company.com");
         map3.put("group", "USER");
@@ -354,18 +359,18 @@ class RecipientTest {
     }
 
     @Test
-    @DisplayName("fromMapList: 대소문자 혼용 이메일 중복 제거")
-    void fromMapList_caseInsensitiveEmailDuplicates() {
+    public void fromMapList_caseInsensitiveEmailDuplicates() {
+        // fromMapList: 대소문자 혼용 이메일 중복 제거
         // Given - 대소문자만 다른 이메일
-        List<Map<String, Object>> maps = new ArrayList<>();
+        List<Map<String, Object>> maps = new ArrayList<Map<String, Object>>();
 
-        Map<String, Object> map1 = new HashMap<>();
+        Map<String, Object> map1 = new HashMap<String, Object>();
         map1.put("userId", "admin1");
         map1.put("email", "Admin@Company.com");  // 대문자 포함
         map1.put("group", "ADM");
         maps.add(map1);
 
-        Map<String, Object> map2 = new HashMap<>();
+        Map<String, Object> map2 = new HashMap<String, Object>();
         map2.put("userId", "admin2");
         map2.put("email", "admin@company.com");  // 소문자 (동일 이메일)
         map2.put("group", "ADM");
@@ -380,18 +385,18 @@ class RecipientTest {
     }
 
     @Test
-    @DisplayName("fromMapList: 대소문자 혼용 USER_ID 정규화")
-    void fromMapList_userIdCaseNormalization() {
+    public void fromMapList_userIdCaseNormalization() {
+        // fromMapList: 대소문자 혼용 USER_ID 정규화
         // Given
-        List<Map<String, Object>> maps = new ArrayList<>();
+        List<Map<String, Object>> maps = new ArrayList<Map<String, Object>>();
 
-        Map<String, Object> map1 = new HashMap<>();
+        Map<String, Object> map1 = new HashMap<String, Object>();
         map1.put("userId", "admin");  // 소문자
         map1.put("email", "admin@company.com");
         map1.put("group", "ADM");
         maps.add(map1);
 
-        Map<String, Object> map2 = new HashMap<>();
+        Map<String, Object> map2 = new HashMap<String, Object>();
         map2.put("userId", "UsEr1");  // 혼용
         map2.put("email", "user1@company.com");
         map2.put("group", "USER");
@@ -407,22 +412,22 @@ class RecipientTest {
     }
 
     @Test
-    @DisplayName("fromMapList: 순서 보장 (LinkedHashSet)")
-    void fromMapList_orderPreserved() {
+    public void fromMapList_orderPreserved() {
+        // fromMapList: 순서 보장 (LinkedHashSet)
         // Given - 순서가 중요한 리스트
-        List<Map<String, Object>> maps = new ArrayList<>();
+        List<Map<String, Object>> maps = new ArrayList<Map<String, Object>>();
 
-        Map<String, Object> map1 = new HashMap<>();
+        Map<String, Object> map1 = new HashMap<String, Object>();
         map1.put("userId", "user1");
         map1.put("email", "user1@company.com");
         maps.add(map1);
 
-        Map<String, Object> map2 = new HashMap<>();
+        Map<String, Object> map2 = new HashMap<String, Object>();
         map2.put("userId", "user2");
         map2.put("email", "user2@company.com");
         maps.add(map2);
 
-        Map<String, Object> map3 = new HashMap<>();
+        Map<String, Object> map3 = new HashMap<String, Object>();
         map3.put("userId", "user3");
         map3.put("email", "user3@company.com");
         maps.add(map3);
@@ -437,18 +442,18 @@ class RecipientTest {
     }
 
     @Test
-    @DisplayName("fromMapList: Map 내부 필드 누락 처리")
-    void fromMapList_missingFields() {
+    public void fromMapList_missingFields() {
+        // fromMapList: Map 내부 필드 누락 처리
         // Given - 일부 필드가 누락된 Map
-        List<Map<String, Object>> maps = new ArrayList<>();
+        List<Map<String, Object>> maps = new ArrayList<Map<String, Object>>();
 
-        Map<String, Object> map1 = new HashMap<>();
+        Map<String, Object> map1 = new HashMap<String, Object>();
         map1.put("userId", "admin");
         map1.put("email", "admin@company.com");
         // group 없음
         maps.add(map1);
 
-        Map<String, Object> map2 = new HashMap<>();
+        Map<String, Object> map2 = new HashMap<String, Object>();
         map2.put("email", "user@company.com");
         // userId, group 없음
         maps.add(map2);

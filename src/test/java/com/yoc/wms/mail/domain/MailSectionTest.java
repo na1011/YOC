@@ -2,12 +2,11 @@ package com.yoc.wms.mail.domain;
 
 import com.yoc.wms.mail.enums.SectionType;
 import com.yoc.wms.mail.exception.ValueChainException;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
+import org.junit.Test;
 
 import java.util.*;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.Assert.*;
 
 /**
  * MailSection 단위 테스트
@@ -18,13 +17,12 @@ import static org.junit.jupiter.api.Assertions.*;
  * - 엣지케이스 (null, empty, XSS)
  * - 메타데이터 조회 로직
  */
-class MailSectionTest {
+public class MailSectionTest {
 
     // ==================== Factory Method 테스트 ====================
 
     @Test
-    @DisplayName("forAlarmWithCustomText: 정상 생성 - 테이블 데이터 포함")
-    void forAlarmWithCustomText_withTable() {
+    public void forAlarmWithCustomText_withTable() {
         // Given
         String title = "지연 주문 현황";
         String content = "현재 10건의 지연 주문이 발견되었습니다.";
@@ -58,8 +56,7 @@ class MailSectionTest {
     }
 
     @Test
-    @DisplayName("forAlarmWithCustomText: 테이블 데이터 없음 - TABLE 섹션 생략")
-    void forAlarmWithCustomText_withoutTable() {
+    public void forAlarmWithCustomText_withoutTable() {
         // Given
         String title = "시스템 알림";
         String content = "정상 처리되었습니다.";
@@ -75,11 +72,10 @@ class MailSectionTest {
     }
 
     @Test
-    @DisplayName("forAlarmWithCustomText: 빈 테이블 데이터 - TABLE 섹션 생략")
-    void forAlarmWithCustomText_withEmptyTable() {
+    public void forAlarmWithCustomText_withEmptyTable() {
         // When
         List<MailSection> sections = MailSection.forAlarmWithCustomText(
-            "알림", "내용", "INFO", Collections.emptyList()
+            "알림", "내용", "INFO", Collections.<Map<String, String>>emptyList()
         );
 
         // Then
@@ -88,8 +84,7 @@ class MailSectionTest {
 
 
     @Test
-    @DisplayName("forNotice: 공지 섹션 생성")
-    void forNotice() {
+    public void forNotice() {
         // When
         List<MailSection> sections = MailSection.forNotice("시스템 점검 안내", "12월 1일 00:00 ~ 04:00");
 
@@ -101,8 +96,7 @@ class MailSectionTest {
     }
 
     @Test
-    @DisplayName("forReport: 보고서 섹션 생성 - 테이블 포함")
-    void forReport_withTable() {
+    public void forReport_withTable() {
         // Given
         List<Map<String, String>> tableData = Arrays.asList(
             createMap("date", "2024-11-01", "count", "150"),
@@ -119,8 +113,7 @@ class MailSectionTest {
     }
 
     @Test
-    @DisplayName("forReport: 보고서 섹션 생성 - 테이블 없음")
-    void forReport_withoutTable() {
+    public void forReport_withoutTable() {
         // When
         List<MailSection> sections = MailSection.forReport("요약 보고", "특이사항 없음", null);
 
@@ -129,8 +122,7 @@ class MailSectionTest {
     }
 
     @Test
-    @DisplayName("forSimpleText: 단순 텍스트 섹션")
-    void forSimpleText() {
+    public void forSimpleText() {
         // When
         List<MailSection> sections = MailSection.forSimpleText("안내", "테스트 메시지입니다.");
 
@@ -142,8 +134,7 @@ class MailSectionTest {
     }
 
     @Test
-    @DisplayName("forContact: 연락처 섹션")
-    void forContact() {
+    public void forContact() {
         // When
 //        MailSection section = MailSection.forContact("담당자: 홍길동 (010-1234-5678)");
         List<MailSection> section = MailSection.forContact("담당자: 홍길동 (010-1234-5678)");
@@ -158,101 +149,112 @@ class MailSectionTest {
     // ==================== 검증 로직 테스트 ====================
 
     @Test
-    @DisplayName("검증 실패: type이 null")
-    void validation_nullType() {
+    public void validation_nullType() {
         // When & Then
-        ValueChainException ex = assertThrows(ValueChainException.class, () ->
-            MailSection.builder().content("내용").build()
-        );
-        assertTrue(ex.getMessage().contains("type is required"));
+        try {
+            MailSection.builder().content("내용").build();
+            fail("Expected ValueChainException");
+        } catch (ValueChainException ex) {
+            assertTrue(ex.getMessage().contains("type is required"));
+        }
     }
 
     @Test
-    @DisplayName("검증 실패: TABLE 타입에 data가 null")
-    void validation_tableWithoutData() {
+    public void validation_tableWithoutData() {
         // When & Then
-        ValueChainException ex = assertThrows(ValueChainException.class, () ->
-            MailSection.builder().type(SectionType.TABLE).build()
-        );
-        assertTrue(ex.getMessage().contains("TABLE type requires data"));
+        try {
+            MailSection.builder().type(SectionType.TABLE).build();
+            fail("Expected ValueChainException");
+        } catch (ValueChainException ex) {
+            assertTrue(ex.getMessage().contains("TABLE type requires data"));
+        }
     }
 
     @Test
-    @DisplayName("검증 실패: TABLE 타입에 빈 data")
-    void validation_tableWithEmptyData() {
+    public void validation_tableWithEmptyData() {
         // When & Then
-        ValueChainException ex = assertThrows(ValueChainException.class, () ->
+        try {
             MailSection.builder()
                 .type(SectionType.TABLE)
-                .data(Collections.emptyList())
-                .build()
-        );
-        assertTrue(ex.getMessage().contains("TABLE type requires data"));
+                .data(Collections.<Map<String, String>>emptyList())
+                .build();
+            fail("Expected ValueChainException");
+        } catch (ValueChainException ex) {
+            assertTrue(ex.getMessage().contains("TABLE type requires data"));
+        }
     }
 
     @Test
-    @DisplayName("검증 실패: TEXT 타입에 content가 null")
-    void validation_textWithoutContent() {
+    public void validation_textWithoutContent() {
         // When & Then
-        ValueChainException ex = assertThrows(ValueChainException.class, () ->
-            MailSection.builder().type(SectionType.TEXT).build()
-        );
-        assertTrue(ex.getMessage().contains("TEXT type requires content"));
+        try {
+            MailSection.builder().type(SectionType.TEXT).build();
+            fail("Expected ValueChainException");
+        } catch (ValueChainException ex) {
+            assertTrue(ex.getMessage().contains("TEXT type requires content"));
+        }
     }
 
     @Test
-    @DisplayName("검증 실패: TEXT 타입에 공백 content")
-    void validation_textWithBlankContent() {
+    public void validation_textWithBlankContent() {
         // When & Then
-        ValueChainException ex = assertThrows(ValueChainException.class, () ->
+        try {
             MailSection.builder()
                 .type(SectionType.TEXT)
                 .content("   ")
-                .build()
-        );
-        assertTrue(ex.getMessage().contains("TEXT type requires content"));
+                .build();
+            fail("Expected ValueChainException");
+        } catch (ValueChainException ex) {
+            assertTrue(ex.getMessage().contains("TEXT type requires content"));
+        }
     }
 
     @Test
-    @DisplayName("검증 실패: HTML 타입에 <script> 태그 포함")
-    void validation_htmlWithScriptTag() {
+    public void validation_htmlWithScriptTag() {
         // When & Then
-        ValueChainException ex = assertThrows(ValueChainException.class, () ->
+        try {
             MailSection.builder()
                 .type(SectionType.HTML)
                 .content("<p>Hello</p><script>alert('xss')</script>")
-                .build()
-        );
-        assertTrue(ex.getMessage().contains("unsafe elements"));
+                .build();
+            fail("Expected ValueChainException");
+        } catch (ValueChainException ex) {
+            assertTrue(ex.getMessage().contains("unsafe elements"));
+        }
     }
 
     @Test
-    @DisplayName("검증 실패: HTML 타입에 javascript: 포함")
-    void validation_htmlWithJavascriptProtocol() {
+    public void validation_htmlWithJavascriptProtocol() {
         // When & Then
-        assertThrows(ValueChainException.class, () ->
+        try {
             MailSection.builder()
                 .type(SectionType.HTML)
                 .content("<a href='javascript:void(0)'>Click</a>")
-                .build()
-        );
+                .build();
+            fail("Expected ValueChainException");
+        } catch (ValueChainException ex) {
+            // Expected exception
+            assertTrue(ex.getMessage().contains("unsafe elements"));
+        }
     }
 
     @Test
-    @DisplayName("검증 실패: HTML 타입에 onerror 이벤트")
-    void validation_htmlWithOnError() {
+    public void validation_htmlWithOnError() {
         // When & Then
-        assertThrows(ValueChainException.class, () ->
+        try {
             MailSection.builder()
                 .type(SectionType.HTML)
                 .content("<img src='x' onerror='alert(1)'>")
-                .build()
-        );
+                .build();
+            fail("Expected ValueChainException");
+        } catch (ValueChainException ex) {
+            // Expected exception
+            assertTrue(ex.getMessage().contains("unsafe elements"));
+        }
     }
 
     @Test
-    @DisplayName("검증 성공: DIVIDER는 별도 필드 불필요")
-    void validation_dividerNoRequirement() {
+    public void validation_dividerNoRequirement() {
         // When
         MailSection divider = MailSection.builder().type(SectionType.DIVIDER).build();
 
@@ -264,10 +266,9 @@ class MailSectionTest {
     // ==================== 메타데이터 테스트 ====================
 
     @Test
-    @DisplayName("메타데이터: 정상 조회")
-    void metadata_get() {
+    public void metadata_get() {
         // Given
-        Map<String, Object> metadata = new HashMap<>();
+        Map<String, Object> metadata = new HashMap<String, Object>();
         metadata.put("color", "red");
         metadata.put("size", "large");
 
@@ -285,8 +286,7 @@ class MailSectionTest {
     }
 
     @Test
-    @DisplayName("메타데이터: 기본값 반환")
-    void metadata_defaultValue() {
+    public void metadata_defaultValue() {
         // Given
         MailSection section = MailSection.builder()
             .type(SectionType.DIVIDER)
@@ -298,8 +298,7 @@ class MailSectionTest {
     }
 
     @Test
-    @DisplayName("메타데이터: null 메타데이터 처리")
-    void metadata_nullSafe() {
+    public void metadata_nullSafe() {
         // Given
         MailSection section = MailSection.builder()
             .type(SectionType.DIVIDER)
@@ -314,8 +313,7 @@ class MailSectionTest {
     // ==================== 편의 메서드 테스트 ====================
 
     @Test
-    @DisplayName("hasTitle: 제목 있음")
-    void hasTitle_true() {
+    public void hasTitle_true() {
         // Given
         MailSection section = MailSection.builder()
             .type(SectionType.TEXT)
@@ -328,8 +326,7 @@ class MailSectionTest {
     }
 
     @Test
-    @DisplayName("hasTitle: 제목 없음")
-    void hasTitle_false() {
+    public void hasTitle_false() {
         // Given
         MailSection section = MailSection.builder()
             .type(SectionType.TEXT)
@@ -341,8 +338,7 @@ class MailSectionTest {
     }
 
     @Test
-    @DisplayName("hasTitle: 공백 제목")
-    void hasTitle_blank() {
+    public void hasTitle_blank() {
         // Given
         MailSection section = MailSection.builder()
             .type(SectionType.TEXT)
@@ -357,8 +353,7 @@ class MailSectionTest {
     // ==================== 심각도 아이콘 테스트 ====================
 
     @Test
-    @DisplayName("심각도 아이콘: CRITICAL")
-    void severityIcon_critical() {
+    public void severityIcon_critical() {
         List<MailSection> sections = MailSection.forAlarmWithCustomText(
             "긴급", "내용", "CRITICAL", null
         );
@@ -366,8 +361,7 @@ class MailSectionTest {
     }
 
     @Test
-    @DisplayName("심각도 아이콘: WARNING")
-    void severityIcon_warning() {
+    public void severityIcon_warning() {
         List<MailSection> sections = MailSection.forAlarmWithCustomText(
             "경고", "내용", "WARNING", null
         );
@@ -375,8 +369,7 @@ class MailSectionTest {
     }
 
     @Test
-    @DisplayName("심각도 아이콘: INFO")
-    void severityIcon_info() {
+    public void severityIcon_info() {
         List<MailSection> sections = MailSection.forAlarmWithCustomText(
             "정보", "내용", "INFO", null
         );
@@ -384,8 +377,7 @@ class MailSectionTest {
     }
 
     @Test
-    @DisplayName("심각도 아이콘: 알 수 없는 값 - 기본 아이콘")
-    void severityIcon_unknown() {
+    public void severityIcon_unknown() {
         List<MailSection> sections = MailSection.forAlarmWithCustomText(
             "알림", "내용", "UNKNOWN", null
         );
@@ -393,8 +385,7 @@ class MailSectionTest {
     }
 
     @Test
-    @DisplayName("심각도 아이콘: null - 기본 아이콘")
-    void severityIcon_null() {
+    public void severityIcon_null() {
         List<MailSection> sections = MailSection.forAlarmWithCustomText(
             "알림", "내용", null, null
         );
@@ -402,8 +393,7 @@ class MailSectionTest {
     }
 
     @Test
-    @DisplayName("심각도 아이콘: 소문자 입력 - 정상 처리")
-    void severityIcon_lowercase() {
+    public void severityIcon_lowercase() {
         List<MailSection> sections = MailSection.forAlarmWithCustomText(
             "경고", "내용", "warning", null
         );
@@ -413,7 +403,7 @@ class MailSectionTest {
     // ==================== Helper Methods ====================
 
     private Map<String, String> createMap(String... keyValues) {
-        Map<String, String> map = new HashMap<>();
+        Map<String, String> map = new HashMap<String, String>();
         for (int i = 0; i < keyValues.length; i += 2) {
             map.put(keyValues[i], keyValues[i + 1]);
         }

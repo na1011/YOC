@@ -4,19 +4,25 @@ import com.yoc.wms.mail.dao.MailDao;
 import com.yoc.wms.mail.domain.MailRequest;
 import com.yoc.wms.mail.service.AlarmMailService;
 import com.yoc.wms.mail.service.MailService;
-import org.junit.jupiter.api.*;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.FixMethodOrder;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.MethodSorters;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
+import static org.junit.Assert.*;
+import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.*;
 
 /**
@@ -34,10 +40,11 @@ import static org.mockito.Mockito.*;
  * 9. CLOB 변환 검증
  * 10. 심각도별 처리 (CRITICAL/WARNING/INFO)
  */
+@RunWith(SpringJUnit4ClassRunner.class)
 @SpringBootTest
 @ActiveProfiles("integration")
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-class AlarmMailServiceIntegrationTest {
+@FixMethodOrder(MethodSorters.NAME_ASCENDING)
+public class AlarmMailServiceIntegrationTest {
 
     @Autowired
     private AlarmMailService alarmMailService;
@@ -48,8 +55,8 @@ class AlarmMailServiceIntegrationTest {
     @MockBean  // ⭐ 실제 메일 발송 방지
     private MailService mailService;
 
-    @BeforeEach
-    void setUp() {
+    @Before
+    public void setUp() {
         // 큐 초기화
         mailDao.delete("alarm.deleteAllQueue", null);
 
@@ -65,8 +72,8 @@ class AlarmMailServiceIntegrationTest {
         System.out.println("========================================\n");
     }
 
-    @AfterEach
-    void tearDown() {
+    @After
+    public void tearDown() {
         System.out.println("\n테스트 종료\n");
     }
 
@@ -74,9 +81,7 @@ class AlarmMailServiceIntegrationTest {
     // ==================== 시나리오 1: 정상 발송 (PENDING → SUCCESS) ====================
 
     @Test
-    @Order(1)
-    @DisplayName("시나리오 1: 정상 발송 (PENDING → SUCCESS)")
-    void scenario1_normalFlow_pendingToSuccess() {
+    public void test01_scenario1_normalFlow_pendingToSuccess() {
         System.out.println("\n[시나리오 1] 정상 발송 (PENDING → SUCCESS)");
 
         // Given - Producer 시뮬레이션: 큐에 PENDING 알람 삽입
@@ -112,9 +117,7 @@ class AlarmMailServiceIntegrationTest {
     // ==================== 시나리오 2: 복수 알람 배치 처리 ====================
 
     @Test
-    @Order(2)
-    @DisplayName("시나리오 2: 복수 알람 배치 처리")
-    void scenario2_batchProcessing_multipleAlarms() {
+    public void test02_scenario2_batchProcessing_multipleAlarms() {
         System.out.println("\n[시나리오 2] 복수 알람 배치 처리");
 
         // Given - 3건의 서로 다른 알람 삽입
@@ -152,9 +155,7 @@ class AlarmMailServiceIntegrationTest {
     // ==================== 시나리오 3: 첫 번째 재시도 (RETRY_COUNT 증가) ====================
 
     @Test
-    @Order(3)
-    @DisplayName("시나리오 3: 첫 번째 재시도 (RETRY_COUNT 증가)")
-    void scenario3_firstRetry_retryCountIncrement() {
+    public void test03_scenario3_firstRetry_retryCountIncrement() {
         System.out.println("\n[시나리오 3] 첫 번째 재시도");
 
         // Given - 큐 삽입
@@ -189,9 +190,7 @@ class AlarmMailServiceIntegrationTest {
     // ==================== 시나리오 4: 최종 실패 (3회 재시도 후 FAILED) ====================
 
     @Test
-    @Order(4)
-    @DisplayName("시나리오 4: 최종 실패 (3회 재시도 후 FAILED)")
-    void scenario4_finalFailure_afterMaxRetries() {
+    public void test04_scenario4_finalFailure_afterMaxRetries() {
         System.out.println("\n[시나리오 4] 최종 실패 (3회 재시도 후)");
 
         // Given - RETRY_COUNT = 2인 큐 삽입 (이번 시도가 3번째)
@@ -226,9 +225,7 @@ class AlarmMailServiceIntegrationTest {
     // ==================== 시나리오 5: 재시도 후 성공 (Resilience 검증) ====================
 
     @Test
-    @Order(5)
-    @DisplayName("시나리오 5: 재시도 후 성공 (Resilience)")
-    void scenario5_retryThenSuccess_resilience() {
+    public void test05_scenario5_retryThenSuccess_resilience() {
         System.out.println("\n[시나리오 5] 재시도 후 성공");
 
         // Given - RETRY_COUNT = 1인 큐 삽입 (이전에 1회 실패)
@@ -263,9 +260,7 @@ class AlarmMailServiceIntegrationTest {
     // ==================== 시나리오 6: SQL_ID 동적 조회 - OVERDUE_ORDERS ====================
 
     @Test
-    @Order(6)
-    @DisplayName("시나리오 6: SQL_ID 동적 조회 - OVERDUE_ORDERS")
-    void scenario6_sqlIdDynamicQuery_overdueOrders() {
+    public void test06_scenario6_sqlIdDynamicQuery_overdueOrders() {
         System.out.println("\n[시나리오 6] SQL_ID 동적 조회 - OVERDUE_ORDERS");
 
         // Given - OVERDUE_ORDERS 큐 삽입
@@ -303,9 +298,7 @@ class AlarmMailServiceIntegrationTest {
     // ==================== 시나리오 7: SQL_ID 동적 조회 - LOW_STOCK ====================
 
     @Test
-    @Order(7)
-    @DisplayName("시나리오 7: SQL_ID 동적 조회 - LOW_STOCK")
-    void scenario7_sqlIdDynamicQuery_lowStock() {
+    public void test07_scenario7_sqlIdDynamicQuery_lowStock() {
         System.out.println("\n[시나리오 7] SQL_ID 동적 조회 - LOW_STOCK");
 
         // Given
@@ -342,9 +335,7 @@ class AlarmMailServiceIntegrationTest {
     // ==================== 시나리오 8: 빈 테이블 데이터 (테이블 섹션 생략) ====================
 
     @Test
-    @Order(8)
-    @DisplayName("시나리오 8: 빈 테이블 데이터 (테이블 섹션 생략)")
-    void scenario8_emptyTableData_skipTableSection() {
+    public void test08_scenario8_emptyTableData_skipTableSection() {
         System.out.println("\n[시나리오 8] 빈 테이블 데이터 처리");
 
         // Given - 결과가 0건인 SQL_ID
@@ -382,9 +373,7 @@ class AlarmMailServiceIntegrationTest {
     // ==================== 시나리오 9: CLOB 변환 검증 ====================
 
     @Test
-    @Order(9)
-    @DisplayName("시나리오 9: CLOB 변환 검증")
-    void scenario9_clobConversion_noException() {
+    public void test09_scenario9_clobConversion_noException() {
         System.out.println("\n[시나리오 9] CLOB 변환 검증");
 
         // Given - 긴 CLOB 데이터
@@ -421,9 +410,7 @@ class AlarmMailServiceIntegrationTest {
     // ==================== 시나리오 10: 심각도별 처리 (CRITICAL/WARNING/INFO) ====================
 
     @Test
-    @Order(10)
-    @DisplayName("시나리오 10: 심각도별 처리 (CRITICAL/WARNING/INFO)")
-    void scenario10_severityLevels_allTypes() {
+    public void test10_scenario10_severityLevels_allTypes() {
         System.out.println("\n[시나리오 10] 심각도별 처리");
 
         // Given - 3가지 심각도의 알람 삽입
@@ -462,24 +449,24 @@ class AlarmMailServiceIntegrationTest {
             System.out.println("검증 중 - mailSource: " + mailSource + ", subject: " + subject + ", title: " + title);
 
             if (mailSource.equals("SEVERITY_CRITICAL")) {
-                assertTrue(subject.contains("[긴급]"), "CRITICAL subject should contain [긴급]");
-                assertTrue(title.contains("🔴"), "CRITICAL title should contain 🔴");
+                assertTrue("CRITICAL subject should contain [긴급]", subject.contains("[긴급]"));
+                assertTrue("CRITICAL title should contain 🔴", title.contains("🔴"));
                 criticalFound = true;
             } else if (mailSource.equals("SEVERITY_WARNING")) {
-                assertTrue(subject.contains("[경고]"), "WARNING subject should contain [경고]");
-                assertTrue(title.contains("⚠️"), "WARNING title should contain ⚠️");
+                assertTrue("WARNING subject should contain [경고]", subject.contains("[경고]"));
+                assertTrue("WARNING title should contain ⚠️", title.contains("⚠️"));
                 warningFound = true;
             } else if (mailSource.equals("SEVERITY_INFO")) {
-                assertTrue(subject.contains("[경고]"), "INFO subject should contain [경고]");  // alarmSubject()는 INFO도 [경고] 사용
-                assertTrue(title.contains("ℹ️"), "INFO title should contain ℹ️");
+                assertTrue("INFO subject should contain [경고]", subject.contains("[경고]"));  // alarmSubject()는 INFO도 [경고] 사용
+                assertTrue("INFO title should contain ℹ️", title.contains("ℹ️"));
                 infoFound = true;
             }
         }
 
         // 모든 심각도가 처리되었는지 확인
-        assertTrue(criticalFound, "CRITICAL 알람이 처리되지 않았습니다");
-        assertTrue(warningFound, "WARNING 알람이 처리되지 않았습니다");
-        assertTrue(infoFound, "INFO 알람이 처리되지 않았습니다");
+        assertTrue("CRITICAL 알람이 처리되지 않았습니다", criticalFound);
+        assertTrue("WARNING 알람이 처리되지 않았습니다", warningFound);
+        assertTrue("INFO 알람이 처리되지 않았습니다", infoFound);
 
         System.out.println("✅ 심각도별 처리 완료: CRITICAL/WARNING/INFO");
     }
@@ -488,13 +475,10 @@ class AlarmMailServiceIntegrationTest {
     // ==================== 통합 검증: 모든 시나리오 요약 ====================
 
     @Test
-    @Order(11)
-    @DisplayName("통합 검증: 전체 큐 상태 확인")
-    void scenario11_summary_allScenarios() {
+    public void test11_scenario11_summary_allScenarios() {
         System.out.println("\n[통합 검증] 전체 테스트 요약");
 
         // 이 테스트는 독립적으로 실행되므로 큐가 비어있음
-        // 실제로는 @Order(1)~(10)이 모두 실행된 후에는 각각의 큐가 처리된 상태
 
         System.out.println("\n========================================");
         System.out.println("✅ AlarmMailService 통합 테스트 완료");

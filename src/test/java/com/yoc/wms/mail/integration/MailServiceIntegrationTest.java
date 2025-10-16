@@ -4,15 +4,18 @@ import com.yoc.wms.mail.dao.MailDao;
 import com.yoc.wms.mail.domain.MailRequest;
 import com.yoc.wms.mail.domain.Recipient;
 import com.yoc.wms.mail.service.MailService;
-import org.junit.jupiter.api.*;
+import org.junit.*;
+import org.junit.runner.RunWith;
+import org.junit.runners.MethodSorters;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.Assert.*;
 
 /**
  * MailService 실제 메일 발송 테스트
@@ -26,11 +29,12 @@ import static org.junit.jupiter.api.Assertions.*;
  * 6. CC 포함 메일
  * 7. 발송 로그 검증
  */
+@RunWith(SpringJUnit4ClassRunner.class)
 @SpringBootTest
 @ActiveProfiles("integration")
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-@Disabled("실제 메일 발송 테스트 - 필요 시 @Disabled 제거 후 실행")
-class MailServiceIntegrationTest {
+@FixMethodOrder(MethodSorters.NAME_ASCENDING)
+@Ignore("실제 메일 발송 테스트 - 필요 시 @Ignore 제거 후 실행")
+public class MailServiceIntegrationTest {
 
     @Autowired
     private MailService mailService;
@@ -40,8 +44,8 @@ class MailServiceIntegrationTest {
 
     private List<Recipient> testRecipients;
 
-    @BeforeEach
-    void setUp() {
+    @Before
+    public void setUp() {
         // 테스트용 수신자 설정
         testRecipients = new ArrayList<>();
         testRecipients.add(Recipient.builder()
@@ -61,8 +65,8 @@ class MailServiceIntegrationTest {
         System.out.println("========================================\n");
     }
 
-    @AfterEach
-    void tearDown() throws InterruptedException {
+    @After
+    public void tearDown() throws InterruptedException {
         // 메일 발송 후 대기 (비동기 처리 완료 대기)
         System.out.println("\n메일 발송 완료 대기 중 (5초)...\n");
         TimeUnit.SECONDS.sleep(5);
@@ -71,9 +75,7 @@ class MailServiceIntegrationTest {
     // ==================== 시나리오 1: 단일 섹션 (텍스트만) ====================
 
     @Test
-    @Order(1)
-    @DisplayName("통합 테스트 1: 단일 텍스트 섹션 - 복수 사용자 발송")
-    void scenario1_singleTextSection_multipleRecipients() {
+    public void test01_scenario1_singleTextSection_multipleRecipients() {
         System.out.println("\n[시나리오 1] 단일 텍스트 섹션 - 복수 사용자 발송");
 
         // Given - 범용 Builder 사용
@@ -99,15 +101,13 @@ class MailServiceIntegrationTest {
         // 발송 로그 확인
         List<Map<String, Object>> logs = mailDao.selectList("mail.selectRecentMailLogs", null);
         assertNotNull(logs);
-        assertFalse(logs.isEmpty(), "발송 로그가 생성되어야 함");
+        assertFalse("발송 로그가 생성되어야 함", logs.isEmpty());
     }
 
     // ==================== 시나리오 2: 복수 섹션 (범용 Builder) ====================
 
     @Test
-    @Order(2)
-    @DisplayName("통합 테스트 2: 복수 섹션 (텍스트 + 테이블 + 구분선 + 텍스트) - 범용 Builder")
-    void scenario2_multipleSections_genericBuilder() {
+    public void test02_scenario2_multipleSections_genericBuilder() {
 
         System.out.println("\n[시나리오 2] 복수 섹션 (텍스트 + 테이블 + 구분선 + 텍스트) - 범용 Builder");
 
@@ -163,9 +163,7 @@ class MailServiceIntegrationTest {
     // ==================== 시나리오 3: 알람 메일 (Helper Methods) ====================
 
     @Test
-    @Order(3)
-    @DisplayName("통합 테스트 3: 알람 메일 (WARNING) - Helper Methods")
-    void scenario3_alarmMail_warning_helperMethods() {
+    public void test03_scenario3_alarmMail_warning_helperMethods() {
         System.out.println("\n[시나리오 3] 알람 메일 (WARNING) - Helper Methods");
 
         // Given - 테스트 데이터 직접 생성
@@ -215,9 +213,7 @@ class MailServiceIntegrationTest {
     // ==================== 시나리오 4: 보고서 메일 (Helper Methods) ====================
 
     @Test
-    @Order(4)
-    @DisplayName("통합 테스트 4: 보고서 메일 - Helper Methods")
-    void scenario4_reportMail_helperMethods() {
+    public void test04_scenario4_reportMail_helperMethods() {
         System.out.println("\n[시나리오 4] 보고서 메일 - Helper Methods");
 
         // Given - 테스트 데이터 직접 생성
@@ -264,9 +260,7 @@ class MailServiceIntegrationTest {
     // ==================== 시나리오 5: 공지 메일 (Helper Methods) ====================
 
     @Test
-    @Order(5)
-    @DisplayName("통합 테스트 5: 공지 메일 - Helper Methods")
-    void scenario5_noticeMail_helperMethods() {
+    public void test05_scenario5_noticeMail_helperMethods() {
         System.out.println("\n[시나리오 5] 공지 메일 - Helper Methods");
 
         // Given - Helper Methods 사용
@@ -301,9 +295,7 @@ class MailServiceIntegrationTest {
     // ==================== 시나리오 6: CC 포함 메일 ====================
 
     @Test
-    @Order(6)
-    @DisplayName("통합 테스트 6: CC 포함 메일 발송")
-    void scenario6_mailWithCC() {
+    public void test06_scenario6_mailWithCC() {
         System.out.println("\n[시나리오 6] CC 포함 메일 발송");
 
         // Given - 주 수신자는 ADMIN, CC는 USER
@@ -347,9 +339,7 @@ class MailServiceIntegrationTest {
     // ==================== 시나리오 7: 발송 로그 검증 ====================
 
     @Test
-    @Order(7)
-    @DisplayName("통합 테스트 7: 발송 로그 검증")
-    void scenario7_verifyMailLogs() throws InterruptedException {
+    public void test07_scenario7_verifyMailLogs() throws InterruptedException {
         System.out.println("\n[시나리오 7] 발송 로그 검증");
 
         // Given - 이전 테스트들의 메일 발송 완료 대기
@@ -374,13 +364,16 @@ class MailServiceIntegrationTest {
         }
 
         // 검증
-        assertNotNull(logs, "발송 로그가 존재해야 함");
-        assertTrue(logs.size() >= 1, "최소 1건 이상의 발송 로그가 있어야 함");
+        assertNotNull("발송 로그가 존재해야 함", logs);
+        assertTrue("최소 1건 이상의 발송 로그가 있어야 함", logs.size() >= 1);
 
-        // 모든 메일이 SUCCESS 상태인지 확인
-        long successCount = logs.stream()
-            .filter(log -> "SUCCESS".equals(log.get("sendStatus")))
-            .count();
+        // 모든 메일이 SUCCESS 상태인지 확인 (for-loop 사용)
+        long successCount = 0;
+        for (Map<String, Object> log : logs) {
+            if ("SUCCESS".equals(log.get("sendStatus"))) {
+                successCount++;
+            }
+        }
 
         System.out.println("\n========================================");
         System.out.println("전체 로그: " + logs.size() + "건");

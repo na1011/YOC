@@ -475,12 +475,12 @@ MailRequest.builder()
 
 ---
 
-### Spring 3.2 ASM 호환성 리팩토링 (v2.1.3)
+### Spring 3.1.2 ASM 호환성 리팩토링 (v2.1.3)
 
 **배경:**
-- 개발환경 (Java 17 + Spring Boot 3.5.x)에서는 정상 동작하던 코드가 레거시 운영환경 (Java 8 + Spring Framework 3.2.x)에서 빌드 실패
+- 개발환경 (Java 17 + Spring Boot 3.5.x)에서는 정상 동작하던 코드가 레거시 운영환경 (Java 8 + Spring Framework 3.1.2)에서 빌드 실패
 - 에러: `BeanDefinitionStoreException: Failed to read candidate component class: ArrayIndexOutOfBoundsException`
-- 원인: Spring 3.2.x의 ASM 4는 Java 8 **invokedynamic 바이트코드**를 파싱하지 못함
+- 원인: Spring 3.1.2의 ASM 3.x는 Java 8 **invokedynamic 바이트코드**를 파싱하지 못함
 
 **근본 원인:**
 
@@ -488,16 +488,16 @@ MailRequest.builder()
 |------|---------|---------------|
 | **Java 버전** | 17 | 8 |
 | **컴파일된 bytecode** | version 52 (Java 8 호환) | version 52 (정상) |
-| **Spring 버전** | Spring Boot 3.5.6 | Spring Framework 3.2.x |
-| **ASM 라이브러리** | ASM 9.x (Java 17 지원) | ASM 4 (invokedynamic 미지원) |
+| **Spring 버전** | Spring Boot 3.5.6 | Spring Framework 3.1.2 |
+| **ASM 라이브러리** | ASM 9.x (Java 17 지원) | ASM 3.x (invokedynamic 미지원) |
 
 **문제 구조:**
 
 ```
 Java 8 Lambda/Method Reference/Stream API
   → invokedynamic 바이트코드 생성 (정상 컴파일, bytecode v52)
-  → Spring 3.2.x ASM 4가 컴포넌트 스캔 시 바이트코드 파싱 시도
-  → ❌ ASM 4는 invokedynamic을 파싱하지 못함
+  → Spring 3.1.2 ASM 3.x가 컴포넌트 스캔 시 바이트코드 파싱 시도
+  → ❌ ASM 3.x는 invokedynamic을 파싱하지 못함
   → ArrayIndexOutOfBoundsException 발생
 ```
 
@@ -519,13 +519,13 @@ public static List<Recipient> fromMapList(List<Map<String, Object>> maps) {
     return new ArrayList<>(recipientSet);
 }
 
-// ✅ After: for-loop (Spring 3.2 호환)
+// ✅ After: for-loop (Spring 3.1.2 호환)
 public static List<Recipient> fromMapList(List<Map<String, Object>> maps) {
     if (maps == null || maps.isEmpty()) {
         return new ArrayList<>();
     }
 
-    // Spring 3.2 ASM 호환성을 위해 for-loop 사용 (lambda/method reference 제거)
+    // Spring 3.1.2 ASM 호환성을 위해 for-loop 사용 (lambda/method reference 제거)
     Set<Recipient> recipientSet = new LinkedHashSet<>();
     for (Map<String, Object> map : maps) {
         recipientSet.add(fromMap(map));
@@ -664,7 +664,7 @@ grep -r "\.stream(" src/main/java/
 ```
 
 **개선 효과:**
-- ✅ **Spring 3.2 호환**: 레거시 환경에서 정상 빌드
+- ✅ **Spring 3.1.2 호환**: 레거시 환경에서 정상 빌드
 - ✅ **기능 동일**: 중복 제거, 순서 보장, 정규화 모두 정상 작동
 - ✅ **성능**: for-loop가 Stream API보다 오버헤드 적음 (소규모 컬렉션)
 - ✅ **가독성**: 절차적 코드가 더 명확한 경우도 있음 (convertToStringMap 등)
@@ -695,9 +695,10 @@ grep -r "\.stream(" src/main/java/
    ```
 
 **참고 자료:**
-- [Spring 3.2 Java 8 Lambda 호환성 문제 (StackOverflow)](https://stackoverflow.com/questions/30729125/arrayoutofboundsexception-on-bean-creation-while-using-java-8-constructs)
+- [Spring 3.x Java 8 Lambda 호환성 문제 (StackOverflow)](https://stackoverflow.com/questions/30729125/arrayoutofboundsexception-on-bean-creation-while-using-java-8-constructs)
 - [Spring Framework Java 8 지원 로드맵 (GitHub SPR-11656)](https://github.com/spring-projects/spring-framework/issues/16279)
-- Spring 3.2.10: ASM 5.0 부분 지원, 여전히 제한적
+- Spring 3.1.2: ASM 3.x, invokedynamic 미지원
+- Spring 3.2.x: ASM 4.0, invokedynamic 부분 지원
 - Spring 4.0+: ASM 5.0 완전 지원, Lambda/Stream API 사용 가능
 
 ---
