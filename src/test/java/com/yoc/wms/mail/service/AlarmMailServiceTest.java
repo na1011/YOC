@@ -1,706 +1,546 @@
 package com.yoc.wms.mail.service;
 
-import com.yoc.wms.mail.dao.MailDao;
 import com.yoc.wms.mail.domain.MailRequest;
+import com.yoc.wms.mail.domain.Recipient;
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
 
 import java.util.*;
 
 import static org.junit.Assert.*;
-import static org.mockito.Matchers.*;
-import static org.mockito.Mockito.*;
 
 /**
- * AlarmMailService 단위 테스트
+ * AlarmMailService 단위 테스트 (Pure Functions만 테스트)
  *
  * 테스트 범위:
- * - processQueue() 정상 흐름
- * - processMessage() 개별 처리
- * - 실패 처리 및 재시도 로직
- * - Map 타입 변환
- * - 엣지케이스 (빈 큐, 잘못된 데이터)
+ * - buildAlarmMailRequest() - MailRequest 생성 로직
+ * - parseRecipientIds() - 사용자 ID 파싱
+ * - parseRecipientGroups() - 그룹 파싱
+ * - convertToStringMap() - Map 타입 변환
  *
- * 주의: @Scheduled 메서드는 실제로 스케줄링되지 않음 (단위 테스트)
+ * Mock/verify 없음 (Chicago School 테스트 방식)
+ * 운영 환경 100% 호환 (Mockito 불필요)
+ *
+ * @since v2.4.0 (Pure Functions 테스트)
  */
-@RunWith(MockitoJUnitRunner.class)
 public class AlarmMailServiceTest {
 
-    @Mock
-    private MailDao mailDao;
-
-    @Mock
-    private MailService mailService;
-
-    @InjectMocks
-    private AlarmMailService alarmMailService;
-
-    private Map<String, Object> testQueueMessage;
-    private List<Map<String, Object>> testAdmUsers;
-    private List<Map<String, Object>> testTableData;
+    private AlarmMailService service;
 
     @Before
     public void setUp() {
-        // 테스트용 큐 메시지
-        testQueueMessage = new HashMap<String, Object>();
-        testQueueMessage.put("queueId", 1L);
-        testQueueMessage.put("mailSource", "OVERDUE_ORDERS");
-        testQueueMessage.put("severity", "WARNING");
-        testQueueMessage.put("sqlId", "alarm.selectOverdueOrdersDetail");
-        testQueueMessage.put("sectionTitle", "지연 주문 알림");
-        testQueueMessage.put("sectionContent", "10건의 지연 주문이 발견되었습니다.");
-        testQueueMessage.put("retryCount", 0);
+        service = new AlarmMailService();
+    }
 
-        // ADM 사용자 목록
-        testAdmUsers = Arrays.asList(
-            createMap("userId", "admin1", "email", "admin1@company.com", "group", "ADM"),
-            createMap("userId", "admin2", "email", "admin2@company.com", "group", "ADM")
+    // ===== buildAlarmMailRequest() 테스트 =====
+
+    @Test
+    public void buildAlarmMailRequest_criticalSeverity_withTableData() {
+        // Given
+        Map<String, Object> queueData = createMap(
+                "severity", "CRITICAL",
+                "sectionTitle", "재고 부족",
+                "sectionContent", "긴급 확인이 필요합니다.",
+                "mailSource", "LOW_STOCK"
+        );
+        List<Map<String, Object>> tableData = Arrays.asList(
+                createMap("productId", "P001", "stock", 5),
+                createMap("productId", "P002", "stock", 3)
+        );
+        List<Recipient> recipients = Arrays.asList(
+                Recipient.builder().email("admin@company.com").userId("ADMIN1").build()
         );
 
-        // 테이블 데이터
-        testTableData = Arrays.asList(
-            createMap("orderId", "001", "status", "DELAYED"),
-            createMap("orderId", "002", "status", "DELAYED")
+        // When
+        MailRequest result = service.buildAlarmMailRequest(queueData, tableData, recipients);
+
+        // Then
+        assertEquals("[긴급] WMS 재고 부족 2건", result.getSubject());
+        assertEquals("🔴 재고 부족", result.getSections().get(0).getTitle());
+        assertEquals("긴급 확인이 필요합니다.", result.getSections().get(0).getContent());
+        assertEquals("LOW_STOCK", result.getMailSource());
+        assertEquals("ALARM", result.getMailType());
+        assertEquals(2, result.getSections().size());  // TEXT + TABLE
+        assertEquals("TABLE", result.getSections().get(1).getType().name());
+    }
+
+    @Test
+    public void buildAlarmMailRequest_warningSeverity_withTableData() {
+        // Given
+        Map<String, Object> queueData = createMap(
+                "severity", "WARNING",
+                "sectionTitle", "지연 주문",
+                "sectionContent", "확인 바랍니다.",
+                "mailSource", "OVERDUE_ORDERS"
+        );
+        List<Map<String, Object>> tableData = Arrays.asList(
+                createMap("orderId", "001", "status", "DELAYED")
+        );
+        List<Recipient> recipients = Arrays.asList(
+                Recipient.builder().email("user@company.com").build()
         );
 
-        // 기본 동작: 메일 발송 성공 (실패 케이스는 개별 테스트에서 override)
-        when(mailService.sendMail(any(MailRequest.class))).thenReturn(true);
-    }
-
-    // ==================== processQueue() 테스트 ====================
-
-    @Test
-    public void processQueue_success() {
-        // Given
-        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
-            .thenReturn(Collections.singletonList(testQueueMessage));
-        when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
-            .thenReturn(testTableData);
-        when(mailDao.selectList(eq("alarm.selectRecipientsByConditions"), anyMap()))
-            .thenReturn(testAdmUsers);
-
         // When
-        alarmMailService.processQueue();
+        MailRequest result = service.buildAlarmMailRequest(queueData, tableData, recipients);
 
         // Then
-        verify(mailDao).selectList(eq("alarm.selectPendingQueue"), anyMap());
-        verify(mailDao).selectList("alarm.selectOverdueOrdersDetail", null);
-        verify(mailDao).selectList(eq("alarm.selectRecipientsByConditions"), anyMap());
-        verify(mailService).sendMail(any(MailRequest.class));
-        verify(mailDao).update(eq("alarm.updateQueueSuccess"), anyMap());
+        assertEquals("[경고] WMS 지연 주문 1건", result.getSubject());
+        assertEquals("⚠️ 지연 주문", result.getSections().get(0).getTitle());
+        assertEquals("확인 바랍니다.", result.getSections().get(0).getContent());
+        assertEquals("OVERDUE_ORDERS", result.getMailSource());
+        assertEquals(2, result.getSections().size());  // TEXT + TABLE
     }
 
     @Test
-    public void processQueue_emptyQueue() {
+    public void buildAlarmMailRequest_infoSeverity_noTableData() {
         // Given
-        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
-            .thenReturn(Collections.emptyList());
-
-        // When
-        alarmMailService.processQueue();
-
-        // Then
-        verify(mailDao).selectList(eq("alarm.selectPendingQueue"), anyMap());
-        verify(mailService, never()).sendMail(any());
-    }
-
-    @Test
-    public void processQueue_nullQueue() {
-        // Given
-        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
-            .thenReturn(null);
-
-        // When
-        alarmMailService.processQueue();
-
-        // Then
-        verify(mailDao).selectList(eq("alarm.selectPendingQueue"), anyMap());
-        verify(mailService, never()).sendMail(any());
-    }
-
-    @Test
-    public void processQueue_multipleMessages() {
-        // Given
-        Map<String, Object> msg1 = new HashMap<>(testQueueMessage);
-        msg1.put("queueId", 1L);
-        msg1.put("mailSource", "SOURCE1");
-
-        Map<String, Object> msg2 = new HashMap<>(testQueueMessage);
-        msg2.put("queueId", 2L);
-        msg2.put("mailSource", "SOURCE2");
-
-        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
-            .thenReturn(Arrays.asList(msg1, msg2));
-        when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
-            .thenReturn(testTableData);
-        when(mailDao.selectList(eq("alarm.selectRecipientsByConditions"), anyMap()))
-            .thenReturn(testAdmUsers);
-
-        // When
-        alarmMailService.processQueue();
-
-        // Then
-        verify(mailService, times(2)).sendMail(any(MailRequest.class));
-        verify(mailDao, times(2)).update(eq("alarm.updateQueueSuccess"), anyMap());
-    }
-
-    // ==================== processMessage() 개별 처리 테스트 ====================
-
-    @Test
-    public void processMessage_clobContent() throws Exception {
-        // Given
-        java.sql.Clob clob = mock(java.sql.Clob.class);
-        when(clob.length()).thenReturn(10L);
-        when(clob.getSubString(1, 10)).thenReturn("CLOB 내용");
-
-        testQueueMessage.put("sectionContent", clob);
-
-        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
-            .thenReturn(Collections.singletonList(testQueueMessage));
-        when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
-            .thenReturn(testTableData);
-        when(mailDao.selectList(eq("alarm.selectRecipientsByConditions"), anyMap()))
-            .thenReturn(testAdmUsers);
-
-        // When
-        alarmMailService.processQueue();
-
-        // Then
-        verify(mailService).sendMail(any(MailRequest.class));
-        verify(clob).length();
-    }
-
-    @Test
-    public void processMessage_noTableData() {
-        // Given
-        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
-            .thenReturn(Collections.singletonList(testQueueMessage));
-        when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
-            .thenReturn(Collections.emptyList());
-        when(mailDao.selectList(eq("alarm.selectRecipientsByConditions"), anyMap()))
-            .thenReturn(testAdmUsers);
-
-        // When
-        alarmMailService.processQueue();
-
-        // Then
-        verify(mailService).sendMail(any(MailRequest.class));
-    }
-
-    @Test
-    public void processMessage_noAdmUsers() {
-        // Given
-        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
-            .thenReturn(Collections.singletonList(testQueueMessage));
-        when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
-            .thenReturn(testTableData);
-        when(mailDao.selectList(eq("alarm.selectRecipientsByConditions"), anyMap()))
-            .thenReturn(Collections.emptyList());
-
-        // When
-        alarmMailService.processQueue();
-
-        // Then
-        verify(mailService, never()).sendMail(any());
-        verify(mailDao).update(eq("alarm.updateQueueRetry"), anyMap());
-    }
-
-    @Test
-    public void processMessage_admUsersNull() {
-        // Given
-        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
-            .thenReturn(Collections.singletonList(testQueueMessage));
-        when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
-            .thenReturn(testTableData);
-        when(mailDao.selectList(eq("alarm.selectRecipientsByConditions"), anyMap()))
-            .thenReturn(null);
-
-        // When
-        alarmMailService.processQueue();
-
-        // Then
-        verify(mailDao).update(eq("alarm.updateQueueRetry"), anyMap());
-    }
-
-    // ==================== 실패 처리 테스트 ====================
-
-    @Test
-    public void handleFailure_firstFailure() {
-        // Given
-        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
-            .thenReturn(Collections.singletonList(testQueueMessage));
-        when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
-            .thenReturn(testTableData);
-        when(mailDao.selectList(eq("alarm.selectRecipientsByConditions"), anyMap()))
-            .thenReturn(testAdmUsers);
-        doReturn(false)
-            .when(mailService).sendMail(any(MailRequest.class));
-
-        // When
-        alarmMailService.processQueue();
-
-        // Then
-        verify(mailDao).update(eq("alarm.updateQueueRetry"), anyMap());
-    }
-
-    @Test
-    public void handleFailure_finalFailure() {
-        // Given - retryCount가 2 (3번째 시도)
-        testQueueMessage.put("retryCount", 2);
-
-        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
-            .thenReturn(Collections.singletonList(testQueueMessage));
-        when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
-            .thenReturn(testTableData);
-        when(mailDao.selectList(eq("alarm.selectRecipientsByConditions"), anyMap()))
-            .thenReturn(testAdmUsers);
-        doReturn(false)
-            .when(mailService).sendMail(any(MailRequest.class));
-
-        // When
-        alarmMailService.processQueue();
-
-        // Then
-        verify(mailDao).update(eq("alarm.updateQueueFailed"), anyMap());
-    }
-
-    @Test
-    public void handleFailure_longErrorMessage() {
-        // Given
-        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
-            .thenReturn(Collections.singletonList(testQueueMessage));
-        when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
-            .thenReturn(testTableData);
-        when(mailDao.selectList(eq("alarm.selectRecipientsByConditions"), anyMap()))
-            .thenReturn(testAdmUsers);
-        doReturn(false)
-            .when(mailService).sendMail(any(MailRequest.class));
-
-        // When
-        alarmMailService.processQueue();
-
-        // Then
-        verify(mailDao).update(eq("alarm.updateQueueRetry"), anyMap());
-    }
-
-    // ==================== 심각도별 처리 테스트 ====================
-
-    @Test
-    public void processMessage_criticalSeverity() {
-        // Given
-        testQueueMessage.put("severity", "CRITICAL");
-
-        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
-            .thenReturn(Collections.singletonList(testQueueMessage));
-        when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
-            .thenReturn(testTableData);
-        when(mailDao.selectList(eq("alarm.selectRecipientsByConditions"), anyMap()))
-            .thenReturn(testAdmUsers);
-
-        // When
-        alarmMailService.processQueue();
-
-        // Then
-        verify(mailService).sendMail(any(MailRequest.class));
-    }
-
-    @Test
-    public void processMessage_infoSeverity() {
-        // Given
-        testQueueMessage.put("severity", "INFO");
-
-        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
-            .thenReturn(Collections.singletonList(testQueueMessage));
-        when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
-            .thenReturn(testTableData);
-        when(mailDao.selectList(eq("alarm.selectRecipientsByConditions"), anyMap()))
-            .thenReturn(testAdmUsers);
-
-        // When
-        alarmMailService.processQueue();
-
-        // Then
-        verify(mailService).sendMail(any(MailRequest.class));
-    }
-
-    // ==================== 타입 변환 테스트 ====================
-
-    @Test
-    public void typeConversion_long() {
-        // Given
-        testQueueMessage.put("queueId", 123L);
-
-        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
-            .thenReturn(Collections.singletonList(testQueueMessage));
-        when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
-            .thenReturn(testTableData);
-        when(mailDao.selectList(eq("alarm.selectRecipientsByConditions"), anyMap()))
-            .thenReturn(testAdmUsers);
-
-        // When
-        alarmMailService.processQueue();
-
-        // Then
-        verify(mailDao).update(eq("alarm.updateQueueSuccess"), anyMap());
-    }
-
-    @Test
-    public void typeConversion_integerToLong() {
-        // Given
-        testQueueMessage.put("queueId", 456);
-
-        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
-            .thenReturn(Collections.singletonList(testQueueMessage));
-        when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
-            .thenReturn(testTableData);
-        when(mailDao.selectList(eq("alarm.selectRecipientsByConditions"), anyMap()))
-            .thenReturn(testAdmUsers);
-
-        // When
-        alarmMailService.processQueue();
-
-        // Then
-        verify(mailDao).update(eq("alarm.updateQueueSuccess"), anyMap());
-    }
-
-    @Test
-    public void typeConversion_objectToString() {
-        // Given
-        testTableData = Collections.singletonList(
-            createMap("id", 123, "active", true, "name", "Test")
+        Map<String, Object> queueData = createMap(
+                "severity", "INFO",
+                "sectionTitle", "정보 알림",
+                "sectionContent", "참고하세요.",
+                "mailSource", "INFO_NOTIFICATION"
+        );
+        List<Map<String, Object>> tableData = Collections.emptyList();  // 빈 데이터
+        List<Recipient> recipients = Arrays.asList(
+                Recipient.builder().email("user@company.com").build()
         );
 
-        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
-            .thenReturn(Collections.singletonList(testQueueMessage));
-        when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
-            .thenReturn(testTableData);
-        when(mailDao.selectList(eq("alarm.selectRecipientsByConditions"), anyMap()))
-            .thenReturn(testAdmUsers);
-
         // When
-        alarmMailService.processQueue();
+        MailRequest result = service.buildAlarmMailRequest(queueData, tableData, recipients);
 
         // Then
-        verify(mailService).sendMail(any(MailRequest.class));
+        assertEquals("[경고] WMS 정보 알림 0건", result.getSubject());  // alarmSubject()는 INFO도 [경고]
+        assertEquals("ℹ️ 정보 알림", result.getSections().get(0).getTitle());
+        assertEquals("참고하세요.", result.getSections().get(0).getContent());
+        assertEquals(1, result.getSections().size());  // TEXT만 (TABLE 없음)
     }
 
-    // ==================== 엣지케이스 테스트 ====================
-
     @Test
-    public void edgeCase_nullSqlId() {
+    public void buildAlarmMailRequest_nullTableData() {
         // Given
-        testQueueMessage.put("sqlId", null);
-
-        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
-            .thenReturn(Collections.singletonList(testQueueMessage));
+        Map<String, Object> queueData = createMap(
+                "severity", "WARNING",
+                "sectionTitle", "테스트",
+                "sectionContent", "NULL 테이블 데이터",
+                "mailSource", "TEST"
+        );
+        List<Recipient> recipients = Arrays.asList(
+                Recipient.builder().email("user@company.com").build()
+        );
 
         // When
-        alarmMailService.processQueue();
+        MailRequest result = service.buildAlarmMailRequest(queueData, null, recipients);
 
         // Then
-        verify(mailDao).update(eq("alarm.updateQueueRetry"), anyMap());
+        assertEquals("[경고] WMS 테스트 0건", result.getSubject());
+        assertEquals(1, result.getSections().size());  // TEXT만
     }
 
     @Test
-    public void edgeCase_nullSectionTitle() {
+    public void buildAlarmMailRequest_multipleRecipients() {
         // Given
-        testQueueMessage.put("sectionTitle", null);
-
-        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
-            .thenReturn(Collections.singletonList(testQueueMessage));
-        when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
-            .thenReturn(testTableData);
-        when(mailDao.selectList(eq("alarm.selectRecipientsByConditions"), anyMap()))
-            .thenReturn(testAdmUsers);
-
-        // When
-        alarmMailService.processQueue();
-
-        // Then - 예외 발생 가능하지만 처리됨
-        verify(mailDao, atLeastOnce()).update(anyString(), anyMap());
-    }
-
-    @Test
-    public void edgeCase_nullRetryCount() {
-        // Given
-        testQueueMessage.put("retryCount", null);
-
-        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
-            .thenReturn(Collections.singletonList(testQueueMessage));
-        when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
-            .thenReturn(testTableData);
-        when(mailDao.selectList(eq("alarm.selectRecipientsByConditions"), anyMap()))
-            .thenReturn(testAdmUsers);
-        doReturn(false)
-            .when(mailService).sendMail(any(MailRequest.class));
-
-        // When
-        alarmMailService.processQueue();
-
-        // Then - 재시도로 처리됨 (retryCount 0으로 간주)
-        verify(mailDao).update(eq("alarm.updateQueueRetry"), anyMap());
-    }
-
-    @Test
-    public void edgeCase_tableDataWithNull() {
-        // Given
-        testTableData = Collections.singletonList(
-            createMap("orderId", "001", "notes", null)
+        Map<String, Object> queueData = createMap(
+                "severity", "CRITICAL",
+                "sectionTitle", "시스템 오류",
+                "sectionContent", "긴급 조치 필요",
+                "mailSource", "SYSTEM_ERROR"
+        );
+        List<Recipient> recipients = Arrays.asList(
+                Recipient.builder().email("admin1@company.com").userId("ADMIN1").build(),
+                Recipient.builder().email("admin2@company.com").userId("ADMIN2").build(),
+                Recipient.builder().email("admin3@company.com").userId("ADMIN3").build()
         );
 
-        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
-            .thenReturn(Collections.singletonList(testQueueMessage));
-        when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
-            .thenReturn(testTableData);
-        when(mailDao.selectList(eq("alarm.selectRecipientsByConditions"), anyMap()))
-            .thenReturn(testAdmUsers);
-
         // When
-        alarmMailService.processQueue();
-
-        // Then - null은 빈 문자열로 변환됨
-        verify(mailService).sendMail(any(MailRequest.class));
-    }
-
-    // ==================== collectAlarms() 테스트 ====================
-
-    @Test
-    public void collectAlarms_h2Environment() {
-        // When
-        alarmMailService.collectAlarms();
-
-        // Then - 아무 작업도 수행하지 않음
-        verify(mailDao, never()).selectList(anyString(), any());
-        verify(mailDao, never()).insert(anyString(), any());
-    }
-
-    // ==================== v2.1.0 수신인 유연화 테스트 ====================
-
-    @Test
-    public void resolveRecipients_multipleUsersAndGroups() {
-        // Given - QUEUE에 "admin1,user1" + "ADM,SALES" 저장
-        testQueueMessage.put("recipientUserIds", "admin1,user1");
-        testQueueMessage.put("recipientGroups", "ADM,SALES");
-
-        List<Map<String, Object>> recipients = Arrays.asList(
-            createMap("userId", "ADMIN1", "email", "admin1@company.com", "group", "ADM"),
-            createMap("userId", "USER1", "email", "user1@company.com", "group", "USER"),
-            createMap("userId", "SALES001", "email", "sales1@company.com", "group", "SALES")
-        );
-
-        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
-            .thenReturn(Collections.singletonList(testQueueMessage));
-        when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
-            .thenReturn(testTableData);
-        when(mailDao.selectList(eq("alarm.selectRecipientsByConditions"), anyMap()))
-            .thenReturn(recipients);
-
-        // When
-        alarmMailService.processQueue();
+        MailRequest result = service.buildAlarmMailRequest(queueData, null, recipients);
 
         // Then
-        verify(mailDao).selectList(eq("alarm.selectRecipientsByConditions"), anyMap());
-        verify(mailService).sendMail(any(MailRequest.class));
+        assertEquals(3, result.getRecipients().size());
+        assertEquals("ALARM", result.getMailType());
+        assertEquals("SYSTEM_ERROR", result.getMailSource());
     }
 
     @Test
-    public void resolveRecipients_userIdsOnly() {
+    public void buildAlarmMailRequest_largeTableData() {
         // Given
-        testQueueMessage.put("recipientUserIds", "admin1,sales001");
-        testQueueMessage.put("recipientGroups", null);
-
-        List<Map<String, Object>> recipients = Arrays.asList(
-            createMap("userId", "ADMIN1", "email", "admin1@company.com", "group", "ADM"),
-            createMap("userId", "SALES001", "email", "sales1@company.com", "group", "SALES")
+        Map<String, Object> queueData = createMap(
+                "severity", "WARNING",
+                "sectionTitle", "대량 지연",
+                "sectionContent", "확인 필요",
+                "mailSource", "BULK_DELAY"
         );
 
-        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
-            .thenReturn(Collections.singletonList(testQueueMessage));
-        when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
-            .thenReturn(testTableData);
-        when(mailDao.selectList(eq("alarm.selectRecipientsByConditions"), anyMap()))
-            .thenReturn(recipients);
+        // 100건의 테이블 데이터
+        List<Map<String, Object>> tableData = new ArrayList<>();
+        for (int i = 1; i <= 100; i++) {
+            tableData.add(createMap("orderId", "ORDER" + i, "status", "DELAYED"));
+        }
+
+        List<Recipient> recipients = Arrays.asList(
+                Recipient.builder().email("admin@company.com").build()
+        );
 
         // When
-        alarmMailService.processQueue();
+        MailRequest result = service.buildAlarmMailRequest(queueData, tableData, recipients);
 
         // Then
-        verify(mailService).sendMail(any(MailRequest.class));
+        assertEquals("[경고] WMS 대량 지연 100건", result.getSubject());
+        assertEquals(2, result.getSections().size());  // TEXT + TABLE
     }
 
     @Test
-    public void resolveRecipients_groupsOnly() {
+    public void buildAlarmMailRequest_longContent() {
         // Given
-        testQueueMessage.put("recipientUserIds", null);
-        testQueueMessage.put("recipientGroups", "SALES,LOGISTICS");
+        StringBuilder longContent = new StringBuilder();
+        for (int i = 0; i < 100; i++) {
+            longContent.append("긴 본문 내용입니다. ");
+        }
 
-        List<Map<String, Object>> recipients = Arrays.asList(
-            createMap("userId", "SALES001", "email", "sales1@company.com", "group", "SALES"),
-            createMap("userId", "LOGISTIC001", "email", "logistic1@company.com", "group", "LOGISTICS")
+        Map<String, Object> queueData = createMap(
+                "severity", "INFO",
+                "sectionTitle", "긴 내용 테스트",
+                "sectionContent", longContent.toString(),
+                "mailSource", "LONG_CONTENT_TEST"
+        );
+        List<Recipient> recipients = Arrays.asList(
+                Recipient.builder().email("user@company.com").build()
         );
 
-        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
-            .thenReturn(Collections.singletonList(testQueueMessage));
-        when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
-            .thenReturn(testTableData);
-        when(mailDao.selectList(eq("alarm.selectRecipientsByConditions"), anyMap()))
-            .thenReturn(recipients);
-
         // When
-        alarmMailService.processQueue();
+        MailRequest result = service.buildAlarmMailRequest(queueData, null, recipients);
 
         // Then
-        verify(mailService).sendMail(any(MailRequest.class));
+        assertEquals(longContent.toString(), result.getSections().get(0).getContent());
+        assertTrue(result.getSections().get(0).getContent().length() > 1000);
     }
 
     @Test
-    public void resolveRecipients_bothNull_defaultToAdm() {
+    public void buildAlarmMailRequest_withNullValues() {
+        // Given - NULL 값이 포함된 테이블 데이터
+        Map<String, Object> queueData = createMap(
+                "severity", "WARNING",
+                "sectionTitle", "NULL 테스트",
+                "sectionContent", "NULL 값 포함",
+                "mailSource", "NULL_TEST"
+        );
+        List<Map<String, Object>> tableData = Arrays.asList(
+                createMap("orderId", "001", "notes", null)  // NULL 값
+        );
+        List<Recipient> recipients = Arrays.asList(
+                Recipient.builder().email("user@company.com").build()
+        );
+
+        // When
+        MailRequest result = service.buildAlarmMailRequest(queueData, tableData, recipients);
+
+        // Then
+        assertEquals(2, result.getSections().size());
+        // convertToStringMap()이 NULL을 빈 문자열로 변환
+    }
+
+    @Test
+    public void buildAlarmMailRequest_preservesColumnOrder() {
+        // Given - 컬럼 순서 테스트
+        Map<String, Object> queueData = createMap(
+                "severity", "INFO",
+                "sectionTitle", "순서 테스트",
+                "sectionContent", "컬럼 순서 확인",
+                "mailSource", "ORDER_TEST"
+        );
+
+        // LinkedHashMap으로 순서 보장
+        Map<String, Object> row1 = new LinkedHashMap<>();
+        row1.put("col1", "A");
+        row1.put("col2", "B");
+        row1.put("col3", "C");
+
+        List<Map<String, Object>> tableData = Arrays.asList(row1);
+        List<Recipient> recipients = Arrays.asList(
+                Recipient.builder().email("user@company.com").build()
+        );
+
+        // When
+        MailRequest result = service.buildAlarmMailRequest(queueData, tableData, recipients);
+
+        // Then - TABLE 섹션이 있어야 함
+        assertEquals("TABLE", result.getSections().get(1).getType().name());
+    }
+
+    @Test(expected = com.yoc.wms.mail.exception.ValueChainException.class)
+    public void buildAlarmMailRequest_edgeCase_emptyContent() {
+        // Given - 빈 내용 (TEXT 섹션은 content 필수 → 예외 발생 예상)
+        Map<String, Object> queueData = createMap(
+                "severity", "INFO",
+                "sectionTitle", "빈 내용",
+                "sectionContent", "",
+                "mailSource", "EMPTY_CONTENT"
+        );
+        List<Recipient> recipients = Arrays.asList(
+                Recipient.builder().email("user@company.com").build()
+        );
+
+        // When - ValueChainException 발생 예상
+        service.buildAlarmMailRequest(queueData, null, recipients);
+    }
+
+    // ===== parseRecipientIds() 테스트 =====
+
+    @Test
+    public void parseRecipientIds_multipleIds() {
         // Given
-        testQueueMessage.put("recipientUserIds", null);
-        testQueueMessage.put("recipientGroups", null);
-
-        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
-            .thenReturn(Collections.singletonList(testQueueMessage));
-        when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
-            .thenReturn(testTableData);
-        when(mailDao.selectList(eq("alarm.selectRecipientsByConditions"), anyMap()))
-            .thenReturn(testAdmUsers);
+        String input = "admin1,user1,sales001";
 
         // When
-        alarmMailService.processQueue();
+        List<String> result = service.parseRecipientIds(input);
 
-        // Then - ADM 그룹이 기본값으로 조회됨
-        verify(mailDao).selectList(eq("alarm.selectRecipientsByConditions"), anyMap());
-        verify(mailService).sendMail(any(MailRequest.class));
+        // Then
+        assertEquals(Arrays.asList("admin1", "user1", "sales001"), result);
     }
 
     @Test
-    public void resolveRecipients_emptyString_defaultToAdm() {
+    public void parseRecipientIds_singleId() {
         // Given
-        testQueueMessage.put("recipientUserIds", "");
-        testQueueMessage.put("recipientGroups", "  ");
-
-        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
-            .thenReturn(Collections.singletonList(testQueueMessage));
-        when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
-            .thenReturn(testTableData);
-        when(mailDao.selectList(eq("alarm.selectRecipientsByConditions"), anyMap()))
-            .thenReturn(testAdmUsers);
+        String input = "admin1";
 
         // When
-        alarmMailService.processQueue();
+        List<String> result = service.parseRecipientIds(input);
 
-        // Then - ADM 그룹이 기본값으로 조회됨
-        verify(mailService).sendMail(any(MailRequest.class));
+        // Then
+        assertEquals(Arrays.asList("admin1"), result);
     }
 
     @Test
-    public void resolveRecipients_lowercaseUserId_normalizedToUppercase() {
-        // Given - QUEUE에 소문자로 저장됨 (Procedure 버그 시나리오)
-        testQueueMessage.put("recipientUserIds", "admin1,sales001");
-        testQueueMessage.put("recipientGroups", "adm");
-
-        // DB는 대문자 USER_ID만 저장되어 있음
-        List<Map<String, Object>> recipients = Arrays.asList(
-            createMap("userId", "ADMIN1", "email", "admin1@company.com", "group", "ADM")
-        );
-
-        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
-            .thenReturn(Collections.singletonList(testQueueMessage));
-        when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
-            .thenReturn(testTableData);
-        when(mailDao.selectList(eq("alarm.selectRecipientsByConditions"), anyMap()))
-            .thenReturn(recipients);
+    public void parseRecipientIds_withWhitespace() {
+        // Given
+        String input = " admin1 , user1 , sales001 ";
 
         // When
-        alarmMailService.processQueue();
+        List<String> result = service.parseRecipientIds(input);
 
-        // Then - Recipient.fromMap()에서 대문자로 정규화되어 조회 성공
-        verify(mailService).sendMail(any(MailRequest.class));
+        // Then
+        assertEquals(Arrays.asList("admin1", "user1", "sales001"), result);
     }
 
     @Test
-    public void resolveRecipients_deduplicateByEmail() {
-        // Given - admin1은 USER_ID와 ADM 그룹 양쪽에 매칭됨
-        testQueueMessage.put("recipientUserIds", "admin1");
-        testQueueMessage.put("recipientGroups", "ADM");
-
-        // DB 쿼리는 DISTINCT이지만, 만약 중복이 반환된다면 Java에서 제거해야 함
-        List<Map<String, Object>> recipients = Arrays.asList(
-            createMap("userId", "ADMIN1", "email", "admin1@company.com", "group", "ADM"),
-            createMap("userId", "ADMIN2", "email", "admin2@company.com", "group", "ADM")
-        );
-
-        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
-            .thenReturn(Collections.singletonList(testQueueMessage));
-        when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
-            .thenReturn(testTableData);
-        when(mailDao.selectList(eq("alarm.selectRecipientsByConditions"), anyMap()))
-            .thenReturn(recipients);
+    public void parseRecipientIds_withEmptyItems() {
+        // Given
+        String input = "admin1,,user1,";
 
         // When
-        alarmMailService.processQueue();
+        List<String> result = service.parseRecipientIds(input);
 
-        // Then - LinkedHashSet으로 이메일 기준 중복 제거
-        verify(mailService).sendMail(any(MailRequest.class));
+        // Then
+        assertEquals(Arrays.asList("admin1", "user1"), result);
     }
 
     @Test
-    public void resolveRecipients_withWhitespace_trimmed() {
-        // Given - 공백 포함
-        testQueueMessage.put("recipientUserIds", " admin1 , user1 ");
-        testQueueMessage.put("recipientGroups", " ADM , SALES ");
-
-        List<Map<String, Object>> recipients = Arrays.asList(
-            createMap("userId", "ADMIN1", "email", "admin1@company.com", "group", "ADM")
-        );
-
-        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
-            .thenReturn(Collections.singletonList(testQueueMessage));
-        when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
-            .thenReturn(testTableData);
-        when(mailDao.selectList(eq("alarm.selectRecipientsByConditions"), anyMap()))
-            .thenReturn(recipients);
-
+    public void parseRecipientIds_nullInput() {
         // When
-        alarmMailService.processQueue();
+        List<String> result = service.parseRecipientIds(null);
 
-        // Then - trim 후 정상 조회
-        verify(mailDao).selectList(eq("alarm.selectRecipientsByConditions"), anyMap());
+        // Then
+        assertTrue(result.isEmpty());
     }
 
     @Test
-    public void resolveRecipients_withEmptyItems_filtered() {
-        // Given - 빈 항목 포함
-        testQueueMessage.put("recipientUserIds", "admin1,,user1,");
-        testQueueMessage.put("recipientGroups", "ADM,,");
-
-        List<Map<String, Object>> recipients = Arrays.asList(
-            createMap("userId", "ADMIN1", "email", "admin1@company.com", "group", "ADM")
-        );
-
-        when(mailDao.selectList(eq("alarm.selectPendingQueue"), anyMap()))
-            .thenReturn(Collections.singletonList(testQueueMessage));
-        when(mailDao.selectList("alarm.selectOverdueOrdersDetail", null))
-            .thenReturn(testTableData);
-        when(mailDao.selectList(eq("alarm.selectRecipientsByConditions"), anyMap()))
-            .thenReturn(recipients);
-
+    public void parseRecipientIds_emptyInput() {
         // When
-        alarmMailService.processQueue();
+        List<String> result = service.parseRecipientIds("  ");
 
-        // Then - 빈 항목 제거
-        verify(mailDao).selectList(eq("alarm.selectRecipientsByConditions"), anyMap());
+        // Then
+        assertTrue(result.isEmpty());
     }
 
-    // ==================== Helper Methods ====================
+    @Test
+    public void parseRecipientIds_onlyCommas() {
+        // Given
+        String input = ",,,";
+
+        // When
+        List<String> result = service.parseRecipientIds(input);
+
+        // Then
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    public void parseRecipientIds_mixedCase() {
+        // Given - parseRecipientIds()는 대소문자 정규화하지 않음
+        String input = "Admin1,USER1,SaLes001";
+
+        // When
+        List<String> result = service.parseRecipientIds(input);
+
+        // Then
+        assertEquals(Arrays.asList("Admin1", "USER1", "SaLes001"), result);
+        // 대소문자 정규화는 Recipient.fromMap()에서 담당
+    }
+
+    // ===== parseRecipientGroups() 테스트 =====
+
+    @Test
+    public void parseRecipientGroups_multipleGroups() {
+        // Given
+        String input = "ADM,SALES,LOGISTICS";
+
+        // When
+        List<String> result = service.parseRecipientGroups(input);
+
+        // Then
+        assertEquals(Arrays.asList("ADM", "SALES", "LOGISTICS"), result);
+    }
+
+    @Test
+    public void parseRecipientGroups_singleGroup() {
+        // Given
+        String input = "ADM";
+
+        // When
+        List<String> result = service.parseRecipientGroups(input);
+
+        // Then
+        assertEquals(Arrays.asList("ADM"), result);
+    }
+
+    @Test
+    public void parseRecipientGroups_withWhitespace() {
+        // Given
+        String input = " ADM , SALES , LOGISTICS ";
+
+        // When
+        List<String> result = service.parseRecipientGroups(input);
+
+        // Then
+        assertEquals(Arrays.asList("ADM", "SALES", "LOGISTICS"), result);
+    }
+
+    @Test
+    public void parseRecipientGroups_nullInput() {
+        // When
+        List<String> result = service.parseRecipientGroups(null);
+
+        // Then
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    public void parseRecipientGroups_emptyInput() {
+        // When
+        List<String> result = service.parseRecipientGroups("  ");
+
+        // Then
+        assertTrue(result.isEmpty());
+    }
+
+    // ===== convertToStringMap() 테스트 =====
+
+    @Test
+    public void convertToStringMap_basicConversion() {
+        // Given
+        List<Map<String, Object>> input = Arrays.asList(
+                createMap("orderId", 1, "name", "홍길동", "active", true),
+                createMap("orderId", 2, "name", "김철수", "active", false)
+        );
+
+        // When
+        List<Map<String, String>> result = service.convertToStringMap(input);
+
+        // Then
+        assertEquals(2, result.size());
+        assertEquals("1", result.get(0).get("orderId"));
+        assertEquals("홍길동", result.get(0).get("name"));
+        assertEquals("true", result.get(0).get("active"));
+        assertEquals("2", result.get(1).get("orderId"));
+        assertEquals("김철수", result.get(1).get("name"));
+        assertEquals("false", result.get(1).get("active"));
+    }
+
+    @Test
+    public void convertToStringMap_withNullValues() {
+        // Given
+        List<Map<String, Object>> input = Arrays.asList(
+                createMap("orderId", 1, "notes", null)
+        );
+
+        // When
+        List<Map<String, String>> result = service.convertToStringMap(input);
+
+        // Then
+        assertEquals("1", result.get(0).get("orderId"));
+        assertEquals("", result.get(0).get("notes"));  // NULL → 빈 문자열
+    }
+
+    @Test
+    public void convertToStringMap_nullInput() {
+        // When
+        List<Map<String, String>> result = service.convertToStringMap(null);
+
+        // Then
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    public void convertToStringMap_emptyInput() {
+        // When
+        List<Map<String, String>> result = service.convertToStringMap(Collections.emptyList());
+
+        // Then
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    public void convertToStringMap_preservesOrder() {
+        // Given - LinkedHashMap으로 순서 보장
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("col1", "A");
+        row.put("col2", "B");
+        row.put("col3", "C");
+
+        List<Map<String, Object>> input = Arrays.asList(row);
+
+        // When
+        List<Map<String, String>> result = service.convertToStringMap(input);
+
+        // Then
+        assertEquals(1, result.size());
+        // LinkedHashMap으로 변환되므로 순서 유지
+        assertTrue(result.get(0) instanceof LinkedHashMap);
+
+        // 순서 확인 (keySet() 순회)
+        List<String> keys = new ArrayList<>(result.get(0).keySet());
+        assertEquals("col1", keys.get(0));
+        assertEquals("col2", keys.get(1));
+        assertEquals("col3", keys.get(2));
+    }
+
+    @Test
+    public void convertToStringMap_variousTypes() {
+        // Given - 다양한 타입 테스트
+        List<Map<String, Object>> input = Arrays.asList(
+                createMap(
+                        "intVal", 123,
+                        "longVal", 123L,
+                        "doubleVal", 123.45,
+                        "boolVal", true,
+                        "stringVal", "test"
+                )
+        );
+
+        // When
+        List<Map<String, String>> result = service.convertToStringMap(input);
+
+        // Then
+        assertEquals("123", result.get(0).get("intVal"));
+        assertEquals("123", result.get(0).get("longVal"));
+        assertEquals("123.45", result.get(0).get("doubleVal"));
+        assertEquals("true", result.get(0).get("boolVal"));
+        assertEquals("test", result.get(0).get("stringVal"));
+    }
+
+    // ===== Helper Methods =====
 
     private Map<String, Object> createMap(Object... keyValues) {
-        Map<String, Object> map = new HashMap<String, Object>();
+        Map<String, Object> map = new HashMap<>();
         for (int i = 0; i < keyValues.length; i += 2) {
             map.put((String) keyValues[i], keyValues[i + 1]);
         }

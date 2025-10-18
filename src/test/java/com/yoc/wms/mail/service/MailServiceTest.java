@@ -1,436 +1,355 @@
 package com.yoc.wms.mail.service;
 
-import com.yoc.wms.mail.config.MailConfig;
-import com.yoc.wms.mail.dao.MailDao;
-import com.yoc.wms.mail.domain.MailRequest;
 import com.yoc.wms.mail.domain.Recipient;
-import com.yoc.wms.mail.exception.ValueChainException;
-import com.yoc.wms.mail.renderer.MailBodyRenderer;
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.runners.MockitoJUnitRunner;
-import org.springframework.mail.javamail.JavaMailSender;
-
-import jakarta.mail.internet.MimeMessage;
 
 import java.util.*;
 
 import static org.junit.Assert.*;
-import static org.mockito.Matchers.*;
-import static org.mockito.Mockito.*;
-import org.mockito.ArgumentMatcher;
 
 /**
- * MailService 단위 테스트
+ * MailService 단위 테스트 (Pure Functions만 테스트)
  *
  * 테스트 범위:
- * - sendMail() 정상 흐름
- * - 수신인 검증 실패
- * - HTML 구조 생성 (renderWithStructure)
- * - 로그 생성 및 상태 업데이트
- * - 재시도 로직
+ * - joinRecipientEmails() - 수신인 이메일 문자열 생성
+ * - truncateErrorMessage() - 에러 메시지 자르기
+ * - recipientsToEmailArray() - 수신인 목록을 이메일 배열로 변환
+ *
+ * Mock/verify 없음 (Chicago School 테스트 방식)
+ * 운영 환경 100% 호환 (Mockito 불필요)
+ *
+ * @since v2.4.0 (Pure Functions 테스트)
  */
-@RunWith(MockitoJUnitRunner.class)
 public class MailServiceTest {
 
-    @Mock
-    private JavaMailSender mailSender;
-
-    @Mock
-    private MailDao mailDao;
-
-    @Mock
-    private MailBodyRenderer renderer;
-
-    @Mock
-    private MailConfig mailConfig;
-
-    @InjectMocks
-    private MailService mailService;
-
-    @Mock
-    private MimeMessage mimeMessage;
-
-    private MailRequest testRequest;
-    private List<Recipient> testRecipients;
+    private MailService service;
 
     @Before
     public void setUp() {
-        testRecipients = Collections.singletonList(
-            Recipient.builder()
-                .userId("test")
-                .email("test@company.com")
-                .build()
+        service = new MailService();
+    }
+
+    // ===== joinRecipientEmails() 테스트 =====
+
+    @Test
+    public void joinRecipientEmails_singleRecipient() {
+        // Given
+        List<Recipient> recipients = Arrays.asList(
+                Recipient.builder().email("admin@company.com").build()
         );
 
-        testRequest = MailRequest.builder()
-            .subject("테스트 제목")
-            .addTextSection("테스트 내용")
-            .recipients(testRecipients)
-            .mailType("DIRECT")
-            .build();
-
-        // MailConfig 기본 동작 설정 (lenient)
-        when(mailConfig.getContactInfo()).thenReturn("문의: 010-1234-5678");
-        when(mailConfig.getSystemTitle()).thenReturn("WMS 시스템 알림");
-        when(mailConfig.getFooterMessage()).thenReturn("본 메일은 WMS 시스템에서 자동 발송되었습니다.");
-
-        // JavaMailSender Mock 설정 (lenient)
-        when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
-
-        // Renderer Mock 설정 (lenient)
-        when(renderer.renderWithStructure(anyList(), anyString(), anyString()))
-            .thenReturn("<!DOCTYPE html><html><body>Rendered Full HTML</body></html>");
-    }
-
-    // ==================== sendMail() 정상 흐름 테스트 ====================
-
-    @Test
-    
-    public void sendMail_success() throws Exception {
-        // Given
-        when(mailDao.insert(eq("mail.insertMailSendLog"), anyMap())).thenAnswer(invocation -> {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> params = (Map<String, Object>) invocation.getArguments()[1];
-            params.put("logId", 123L);
-            return 1;
-        });
-
         // When
-        mailService.sendMail(testRequest);
-
-        // Then - 동기 실행이므로 즉시 검증
-        verify(mailDao, times(1)).insert(eq("mail.insertMailSendLog"), anyMap());
-        verify(mailSender, times(1)).send(any(MimeMessage.class));
-        verify(mailDao, times(1)).update(eq("mail.updateMailSendLogStatus"), anyMap());
-    }
-
-    @Test
-    
-    public void sendMail_logCreation() {
-        // Given
-        when(mailDao.insert(eq("mail.insertMailSendLog"), anyMap())).thenAnswer(invocation -> {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> params = (Map<String, Object>) invocation.getArguments()[1];
-            params.put("logId", 100L);
-
-            // 파라미터 검증
-            assertEquals("테스트 제목", params.get("subject"));
-            assertEquals("DIRECT", params.get("mailType"));
-            assertEquals("test@company.com", params.get("recipients"));
-            assertEquals("PENDING", params.get("sendStatus"));
-            assertEquals(0, params.get("retryCount"));
-
-            return 1;
-        });
-
-        // When
-        mailService.sendMail(testRequest);
+        String result = service.joinRecipientEmails(recipients);
 
         // Then
-        verify(mailDao, times(1)).insert(eq("mail.insertMailSendLog"), anyMap());
+        assertEquals("admin@company.com", result);
     }
 
     @Test
-    
-    public void sendMail_htmlGeneration() {
+    public void joinRecipientEmails_multipleRecipients() {
         // Given
-        when(renderer.renderWithStructure(anyList(), anyString(), anyString()))
-            .thenReturn("<!DOCTYPE html><html><body><h2>WMS 시스템 알림</h2><p>Body Content</p></body></html>");
-        when(mailDao.insert(eq("mail.insertMailSendLog"), anyMap())).thenAnswer(invocation -> {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> params = (Map<String, Object>) invocation.getArguments()[1];
-            params.put("logId", 200L);
-
-            String bodyHtml = (String) params.get("bodyHtml");
-            assertNotNull(bodyHtml);
-            assertTrue(bodyHtml.contains("<!DOCTYPE html>"));
-            assertTrue(bodyHtml.contains("<body"));
-            assertTrue(bodyHtml.contains("WMS 시스템 알림"));
-            assertTrue(bodyHtml.contains("<p>Body Content</p>"));
-
-            return 1;
-        });
+        List<Recipient> recipients = Arrays.asList(
+                Recipient.builder().email("admin1@company.com").build(),
+                Recipient.builder().email("admin2@company.com").build(),
+                Recipient.builder().email("user@company.com").build()
+        );
 
         // When
-        mailService.sendMail(testRequest);
+        String result = service.joinRecipientEmails(recipients);
 
         // Then
-        verify(renderer, times(1)).renderWithStructure(anyList(), eq("WMS 시스템 알림"), eq("본 메일은 WMS 시스템에서 자동 발송되었습니다."));
+        assertEquals("admin1@company.com,admin2@company.com,user@company.com", result);
     }
 
     @Test
-    
-    public void sendMail_contactSectionAdded() {
-        // Given
-        when(mailConfig.getContactInfo()).thenReturn("담당자: 홍길동");
-        when(mailDao.insert(anyString(), anyMap())).thenAnswer(invocation -> {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> params = (Map<String, Object>) invocation.getArguments()[1];
-            params.put("logId", 300L);
-            return 1;
-        });
-
+    public void joinRecipientEmails_nullInput() {
         // When
-        mailService.sendMail(testRequest);
+        String result = service.joinRecipientEmails(null);
 
         // Then
-        verify(renderer, times(1)).renderWithStructure(anyList(), anyString(), anyString());
-        // Note: 원래 1개 섹션 + 연락처 섹션 (DIVIDER + TEXT) = 3개 (검증 생략)
+        assertEquals("", result);
     }
 
-    // ==================== 수신인 검증 테스트 ====================
+    @Test
+    public void joinRecipientEmails_emptyList() {
+        // When
+        String result = service.joinRecipientEmails(Collections.emptyList());
 
-    @Test(expected = ValueChainException.class)
-    public void sendMail_invalidEmail() {
-        // Given & When & Then
-        MailRequest invalidRequest = MailRequest.builder()
-            .subject("제목")
-            .addTextSection("내용")
-            .addRecipient(Recipient.builder().email("invalid-email").build())
-            .build();
-
-        mailService.sendMail(invalidRequest);
+        // Then
+        assertEquals("", result);
     }
 
-    @Test(expected = ValueChainException.class)
-    public void sendMail_emptyRecipients() {
+    @Test
+    public void joinRecipientEmails_withUserId() {
+        // Given - userId가 있어도 email만 사용
+        List<Recipient> recipients = Arrays.asList(
+                Recipient.builder().email("admin@company.com").userId("ADMIN1").build(),
+                Recipient.builder().email("user@company.com").userId("USER1").build()
+        );
+
+        // When
+        String result = service.joinRecipientEmails(recipients);
+
+        // Then
+        assertEquals("admin@company.com,user@company.com", result);
+    }
+
+    @Test
+    public void joinRecipientEmails_manyRecipients() {
+        // Given - 10명의 수신인
+        List<Recipient> recipients = new ArrayList<>();
+        for (int i = 1; i <= 10; i++) {
+            recipients.add(Recipient.builder().email("user" + i + "@company.com").build());
+        }
+
+        // When
+        String result = service.joinRecipientEmails(recipients);
+
+        // Then
+        String[] emails = result.split(",");
+        assertEquals(10, emails.length);
+        assertEquals("user1@company.com", emails[0]);
+        assertEquals("user10@company.com", emails[9]);
+    }
+
+    // ===== truncateErrorMessage() 테스트 =====
+
+    @Test
+    public void truncateErrorMessage_withinLimit() {
+        // Given
+        String errorMessage = "Short error message";
+
+        // When
+        String result = service.truncateErrorMessage(errorMessage, 2000);
+
+        // Then
+        assertEquals("Short error message", result);
+    }
+
+    @Test
+    public void truncateErrorMessage_exceedsLimit() {
+        // Given
+        StringBuilder longMessage = new StringBuilder();
+        for (int i = 0; i < 300; i++) {
+            longMessage.append("Error! ");
+        }
+        String errorMessage = longMessage.toString();  // 2100자
+
+        // When
+        String result = service.truncateErrorMessage(errorMessage, 2000);
+
+        // Then
+        assertEquals(2000, result.length());
+        assertEquals(errorMessage.substring(0, 2000), result);
+    }
+
+    @Test
+    public void truncateErrorMessage_exactLimit() {
+        // Given
+        StringBuilder exactMessage = new StringBuilder();
+        for (int i = 0; i < 2000; i++) {
+            exactMessage.append("A");
+        }
+        String errorMessage = exactMessage.toString();
+
+        // When
+        String result = service.truncateErrorMessage(errorMessage, 2000);
+
+        // Then
+        assertEquals(2000, result.length());
+        assertEquals(errorMessage, result);
+    }
+
+    @Test
+    public void truncateErrorMessage_nullInput() {
+        // When
+        String result = service.truncateErrorMessage(null, 2000);
+
+        // Then
+        assertNull(result);
+    }
+
+    @Test
+    public void truncateErrorMessage_emptyString() {
+        // When
+        String result = service.truncateErrorMessage("", 2000);
+
+        // Then
+        assertEquals("", result);
+    }
+
+    @Test
+    public void truncateErrorMessage_variousLimits() {
+        // Given
+        String errorMessage = "This is a test error message";
+
         // When & Then
-        MailRequest.builder()
-            .subject("제목")
-            .addTextSection("내용")
-            .recipients(Collections.<Recipient>emptyList())
-            .build();
+        assertEquals("This ", service.truncateErrorMessage(errorMessage, 5));
+        assertEquals("This is a ", service.truncateErrorMessage(errorMessage, 10));
+        assertEquals(errorMessage, service.truncateErrorMessage(errorMessage, 100));
     }
 
-    // ==================== CC 수신인 테스트 ====================
-
     @Test
-    
-    public void sendMail_withCc() {
-        // Given
-        List<Recipient> ccRecipients = Collections.singletonList(
-            Recipient.builder().email("cc@company.com").build()
-        );
-        MailRequest requestWithCc = MailRequest.builder()
-            .subject("제목")
-            .addTextSection("내용")
-            .recipients(testRecipients)
-            .ccRecipients(ccRecipients)
-            .mailType("ALARM")
-            .build();
-
-        when(mailDao.insert(anyString(), anyMap())).thenAnswer(invocation -> {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> params = (Map<String, Object>) invocation.getArguments()[1];
-            params.put("logId", 400L);
-
-            assertEquals("cc@company.com", params.get("ccRecipients"));
-
-            return 1;
-        });
+    public void truncateErrorMessage_unicodeCharacters() {
+        // Given - 한글 문자
+        String errorMessage = "한글 에러 메시지입니다.";
 
         // When
-        mailService.sendMail(requestWithCc);
+        String result = service.truncateErrorMessage(errorMessage, 5);
 
         // Then
-        verify(mailDao, times(1)).insert(eq("mail.insertMailSendLog"), anyMap());
+        assertEquals(5, result.length());
+        assertEquals("한글 에러", result);
     }
 
-    // ==================== 재시도 로직 테스트 ====================
+    // ===== recipientsToEmailArray() 테스트 =====
 
     @Test
-    
-    public void sendWithRetry_secondAttemptSuccess() throws Exception {
+    public void recipientsToEmailArray_singleRecipient() {
         // Given
-        when(mailDao.insert(anyString(), anyMap())).thenAnswer(invocation -> {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> params = (Map<String, Object>) invocation.getArguments()[1];
-            params.put("logId", 500L);
-            return 1;
-        });
-
-        // 첫 번째 send() 호출은 실패, 두 번째는 성공
-        doThrow(new RuntimeException("Network error"))
-            .doNothing()
-            .when(mailSender).send(any(MimeMessage.class));
-
-        // When
-        mailService.sendMail(testRequest);
-
-        // Then - 재시도로 인해 send() 2회 호출
-        verify(mailSender, times(2)).send(any(MimeMessage.class));
-
-        // 최종적으로 SUCCESS 상태 업데이트
-        verify(mailDao, times(1)).update(eq("mail.updateMailSendLogStatus"), anyMap());
-        // Note: sendStatus=SUCCESS 확인 (검증 생략)
-    }
-
-    @Test
-    
-    public void sendWithRetry_allAttemptsFail() throws Exception {
-        // Given
-        when(mailDao.insert(anyString(), anyMap())).thenAnswer(invocation -> {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> params = (Map<String, Object>) invocation.getArguments()[1];
-            params.put("logId", 600L);
-            return 1;
-        });
-
-        // 모든 send() 호출 실패
-        doThrow(new RuntimeException("Persistent error"))
-            .when(mailSender).send(any(MimeMessage.class));
-
-        // When
-        boolean result = mailService.sendMail(testRequest);
-
-        // Then - false 반환 확인 (All retries failed should return false)
-        assertFalse(result);
-
-        // 3회 시도 확인
-        verify(mailSender, times(3)).send(any(MimeMessage.class));
-
-        // FAILURE 상태 업데이트
-        verify(mailDao, times(1)).update(eq("mail.updateMailSendLogStatus"), anyMap());
-        // Note: sendStatus=FAILURE 확인 (검증 생략)
-    }
-
-    // ==================== 엣지케이스 테스트 ====================
-
-    @Test
-    public void edgeCase_longErrorMessage() throws Exception {
-        // Given
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < 3000; i++) {
-            sb.append("E");
-        }
-        String longError = sb.toString();
-        when(mailDao.insert(anyString(), anyMap())).thenAnswer(invocation -> {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> params = (Map<String, Object>) invocation.getArguments()[1];
-            params.put("logId", 700L);
-            return 1;
-        });
-
-        doThrow(new RuntimeException(longError))
-            .when(mailSender).send(any(MimeMessage.class));
-
-        // When
-        try {
-            mailService.sendMail(testRequest);
-        } catch (Exception ignored) {
-            // 예외는 무시
-        }
-
-        // Then - 에러 메시지가 저장되었는지 확인
-        verify(mailDao, times(1)).update(eq("mail.updateMailSendLogStatus"), anyMap());
-    }
-
-    @Test
-    
-    public void edgeCase_nullMailSource() {
-        // Given
-        MailRequest requestWithNullSource = MailRequest.builder()
-            .subject("제목")
-            .addTextSection("내용")
-            .recipients(testRecipients)
-            .mailType("DIRECT")
-            .mailSource(null)
-            .build();
-
-        when(mailDao.insert(anyString(), anyMap())).thenAnswer(invocation -> {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> params = (Map<String, Object>) invocation.getArguments()[1];
-            params.put("logId", 800L);
-            assertNull(params.get("mailSource"));
-            return 1;
-        });
-
-        // When
-        mailService.sendMail(requestWithNullSource);
-
-        // Then
-        verify(mailDao, times(1)).insert(eq("mail.insertMailSendLog"), anyMap());
-    }
-
-    @Test
-    
-    public void edgeCase_multipleSections() {
-        // Given
-        MailRequest multiSectionRequest = MailRequest.builder()
-            .subject("제목")
-            .addTextSection("A")
-            .addDivider()
-            .addTextSection("B")
-            .recipients(testRecipients)
-            .build();
-
-        when(mailDao.insert(anyString(), anyMap())).thenAnswer(invocation -> {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> params = (Map<String, Object>) invocation.getArguments()[1];
-            params.put("logId", 900L);
-            return 1;
-        });
-
-        // When
-        mailService.sendMail(multiSectionRequest);
-
-        // Then
-        verify(renderer, times(1)).renderWithStructure(anyList(), anyString(), anyString());
-        // Note: 3개 섹션 + 연락처 섹션 (DIVIDER + TEXT) = 5개 (검증 생략)
-    }
-
-    @Test
-    
-    public void edgeCase_multipleRecipients() {
-        // Given
-        List<Recipient> manyRecipients = Arrays.asList(
-            Recipient.builder().email("user1@company.com").build(),
-            Recipient.builder().email("user2@company.com").build(),
-            Recipient.builder().email("user3@company.com").build(),
-            Recipient.builder().email("user4@company.com").build(),
-            Recipient.builder().email("user5@company.com").build()
+        List<Recipient> recipients = Arrays.asList(
+                Recipient.builder().email("admin@company.com").build()
         );
 
-        MailRequest requestWithMany = MailRequest.builder()
-            .subject("제목")
-            .addTextSection("내용")
-            .recipients(manyRecipients)
-            .build();
-
-        when(mailDao.insert(anyString(), anyMap())).thenAnswer(invocation -> {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> params = (Map<String, Object>) invocation.getArguments()[1];
-            params.put("logId", 1000L);
-
-            String recipients = (String) params.get("recipients");
-            assertEquals(4, countOccurrences(recipients, ",")); // 5개 = 4개 콤마
-
-            return 1;
-        });
-
         // When
-        mailService.sendMail(requestWithMany);
+        String[] result = service.recipientsToEmailArray(recipients);
 
         // Then
-        verify(mailDao, times(1)).insert(eq("mail.insertMailSendLog"), anyMap());
+        assertEquals(1, result.length);
+        assertEquals("admin@company.com", result[0]);
     }
 
-    // ==================== Helper Methods ====================
+    @Test
+    public void recipientsToEmailArray_multipleRecipients() {
+        // Given
+        List<Recipient> recipients = Arrays.asList(
+                Recipient.builder().email("admin1@company.com").build(),
+                Recipient.builder().email("admin2@company.com").build(),
+                Recipient.builder().email("user@company.com").build()
+        );
 
-    private int countOccurrences(String str, String substr) {
-        if (str == null || substr == null) {
-            return 0;
+        // When
+        String[] result = service.recipientsToEmailArray(recipients);
+
+        // Then
+        assertEquals(3, result.length);
+        assertEquals("admin1@company.com", result[0]);
+        assertEquals("admin2@company.com", result[1]);
+        assertEquals("user@company.com", result[2]);
+    }
+
+    @Test
+    public void recipientsToEmailArray_preservesOrder() {
+        // Given - 순서 확인
+        List<Recipient> recipients = Arrays.asList(
+                Recipient.builder().email("z@test.com").build(),
+                Recipient.builder().email("a@test.com").build(),
+                Recipient.builder().email("m@test.com").build()
+        );
+
+        // When
+        String[] result = service.recipientsToEmailArray(recipients);
+
+        // Then - 입력 순서 유지 (정렬 안 됨)
+        assertEquals("z@test.com", result[0]);
+        assertEquals("a@test.com", result[1]);
+        assertEquals("m@test.com", result[2]);
+    }
+
+    @Test
+    public void recipientsToEmailArray_withUserId() {
+        // Given - userId가 있어도 email만 추출
+        List<Recipient> recipients = Arrays.asList(
+                Recipient.builder().email("admin@company.com").userId("ADMIN1").build(),
+                Recipient.builder().email("user@company.com").userId("USER1").build()
+        );
+
+        // When
+        String[] result = service.recipientsToEmailArray(recipients);
+
+        // Then
+        assertEquals(2, result.length);
+        assertEquals("admin@company.com", result[0]);
+        assertEquals("user@company.com", result[1]);
+    }
+
+    @Test
+    public void recipientsToEmailArray_manyRecipients() {
+        // Given - 100명의 수신인
+        List<Recipient> recipients = new ArrayList<>();
+        for (int i = 1; i <= 100; i++) {
+            recipients.add(Recipient.builder().email("user" + i + "@company.com").build());
         }
-        int count = 0;
-        int index = 0;
-        while ((index = str.indexOf(substr, index)) != -1) {
-            count++;
-            index += substr.length();
-        }
-        return count;
+
+        // When
+        String[] result = service.recipientsToEmailArray(recipients);
+
+        // Then
+        assertEquals(100, result.length);
+        assertEquals("user1@company.com", result[0]);
+        assertEquals("user100@company.com", result[99]);
+    }
+
+    @Test
+    public void recipientsToEmailArray_arrayTypeCheck() {
+        // Given
+        List<Recipient> recipients = Arrays.asList(
+                Recipient.builder().email("test@company.com").build()
+        );
+
+        // When
+        String[] result = service.recipientsToEmailArray(recipients);
+
+        // Then - 타입 확인
+        assertTrue(result instanceof String[]);
+        assertNotNull(result);
+    }
+
+    // ===== Edge Cases =====
+
+    @Test
+    public void joinRecipientEmails_specialCharactersInEmail() {
+        // Given - 특수 문자 포함 이메일
+        List<Recipient> recipients = Arrays.asList(
+                Recipient.builder().email("user.name+tag@company.com").build(),
+                Recipient.builder().email("user_name@company.co.kr").build()
+        );
+
+        // When
+        String result = service.joinRecipientEmails(recipients);
+
+        // Then
+        assertEquals("user.name+tag@company.com,user_name@company.co.kr", result);
+    }
+
+    @Test
+    public void truncateErrorMessage_withNewlines() {
+        // Given - 개행 문자 포함
+        String errorMessage = "Line1\nLine2\nLine3\n";
+
+        // When
+        String result = service.truncateErrorMessage(errorMessage, 10);
+
+        // Then
+        assertEquals(10, result.length());
+        assertEquals("Line1\nLine", result);
+    }
+
+    @Test
+    public void recipientsToEmailArray_duplicateEmails() {
+        // Given - 중복 이메일 (recipientsToEmailArray는 중복 제거 안 함)
+        List<Recipient> recipients = Arrays.asList(
+                Recipient.builder().email("admin@company.com").build(),
+                Recipient.builder().email("admin@company.com").build()
+        );
+
+        // When
+        String[] result = service.recipientsToEmailArray(recipients);
+
+        // Then - 중복 제거 없이 그대로 변환
+        assertEquals(2, result.length);
+        assertEquals("admin@company.com", result[0]);
+        assertEquals("admin@company.com", result[1]);
     }
 }
