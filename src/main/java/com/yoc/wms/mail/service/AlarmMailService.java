@@ -106,22 +106,8 @@ public class AlarmMailService {
             // 2. 수신인 목록 동적 조회
             List<Recipient> recipients = resolveRecipients(recipientUserIds, recipientGroups);
 
-            // 3. MailRequest 생성 (Builder + Helper Methods 사용)
-            List<Map<String, String>> tableDataString = convertToStringMap(tableData);
-
-            MailRequest.Builder builder = MailRequest.builder()
-                    .subject(MailRequest.alarmSubject(sectionTitle, severity, tableDataString.size()))
-                    .addTextSection(MailRequest.alarmTitle(sectionTitle, severity), sectionContent)
-                    .recipients(recipients)
-                    .mailType("ALARM")
-                    .mailSource(mailSource);
-
-            // 테이블 데이터가 있으면 추가
-            if (tableDataString != null && !tableDataString.isEmpty()) {
-                builder.addTableSection(tableDataString);
-            }
-
-            MailRequest request = builder.build();
+            // 3. MailRequest 생성 (Pure Function 사용)
+            MailRequest request = buildAlarmMailRequest(msg, tableData, recipients);
 
             // 4. MailService 호출 (boolean 반환)
             boolean success = mailService.sendMail(request);
@@ -167,6 +153,152 @@ public class AlarmMailService {
         }
     }
 
+    // ===== Pure Functions (단위 테스트 대상) =====
+
+    /**
+     * 큐 데이터로부터 MailRequest 생성 (Pure Function)
+     *
+     * DAO 호출 없이 비즈니스 로직만 처리합니다.
+     * processMessage()의 핵심 로직을 분리하여 단위 테스트 가능하게 만듭니다.
+     *
+     * @param queueData 큐에서 읽은 데이터 (severity, sectionTitle, sectionContent, mailSource 포함)
+     * @param tableData SQL_ID 실행 결과 (NULL 가능)
+     * @param recipients 조회된 수신인 목록
+     * @return MailRequest 객체
+     * @since v2.4.0 (Pure Function 분리)
+     */
+    public MailRequest buildAlarmMailRequest(
+            Map<String, Object> queueData,
+            List<Map<String, Object>> tableData,
+            List<Recipient> recipients
+    ) {
+        String severity = (String) queueData.get("severity");
+        String sectionTitle = (String) queueData.get("sectionTitle");
+        String sectionContent = MailUtils.convertToString(queueData.get("sectionContent"));
+        String mailSource = (String) queueData.get("mailSource");
+
+        // 테이블 데이터를 String으로 변환
+        List<Map<String, String>> tableDataString = convertToStringMap(tableData);
+
+        // 건수 계산
+        int count = (tableDataString != null && !tableDataString.isEmpty()) ? tableDataString.size() : 0;
+
+        // MailRequest 생성
+        MailRequest.Builder builder = MailRequest.builder()
+                .subject(MailRequest.alarmSubject(sectionTitle, severity, count))
+                .addTextSection(MailRequest.alarmTitle(sectionTitle, severity), sectionContent)
+                .recipients(recipients)
+                .mailType("ALARM")
+                .mailSource(mailSource);
+
+        // 테이블 데이터가 있으면 추가
+        if (tableDataString != null && !tableDataString.isEmpty()) {
+            builder.addTableSection(tableDataString);
+        }
+
+        return builder.build();
+    }
+
+    /**
+     * 수신인 USER_ID 파싱 (Pure Function)
+     *
+     * 콤마로 구분된 사용자 ID 문자열을 List로 변환합니다.
+     * trim + 빈 문자열 제거 처리를 수행합니다.
+     *
+     * Example:
+     *   Input:  " admin1 , user1 , "
+     *   Output: ["admin1", "user1"]
+     *
+     * @param recipientUserIds 콤마 구분 문자열 (NULL 가능)
+     * @return trim된 사용자 ID 리스트 (대소문자 정규화는 하지 않음)
+     * @since v2.4.0 (Pure Function 분리)
+     */
+    public List<String> parseRecipientIds(String recipientUserIds) {
+        List<String> result = new ArrayList<>();
+        if (recipientUserIds == null || recipientUserIds.trim().isEmpty()) {
+            return result;
+        }
+
+        String[] tokens = recipientUserIds.split(",");
+        for (String token : tokens) {
+            String trimmed = token.trim();
+            if (!trimmed.isEmpty()) {
+                result.add(trimmed);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * 수신인 그룹 파싱 (Pure Function)
+     *
+     * 콤마로 구분된 그룹 문자열을 List로 변환합니다.
+     * trim + 빈 문자열 제거 처리를 수행합니다.
+     *
+     * Example:
+     *   Input:  " ADM , SALES , "
+     *   Output: ["ADM", "SALES"]
+     *
+     * @param recipientGroups 콤마 구분 문자열 (NULL 가능)
+     * @return trim된 그룹 리스트 (대소문자 정규화는 하지 않음)
+     * @since v2.4.0 (Pure Function 분리)
+     */
+    public List<String> parseRecipientGroups(String recipientGroups) {
+        List<String> result = new ArrayList<>();
+        if (recipientGroups == null || recipientGroups.trim().isEmpty()) {
+            return result;
+        }
+
+        String[] tokens = recipientGroups.split(",");
+        for (String token : tokens) {
+            String trimmed = token.trim();
+            if (!trimmed.isEmpty()) {
+                result.add(trimmed);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Map 타입 변환 (Object → String, 테이블 렌더링용) - Pure Function
+     *
+     * MyBatis 조회 결과를 MailRequest.addTableSection()에 전달 가능한 형식으로 변환합니다.
+     *
+     * Why LinkedHashMap:
+     * - MailBodyRenderer가 map.keySet()을 순회하며 테이블 헤더 생성
+     * - HashMap은 순서 미보장 → 컬럼 순서가 매번 변경될 수 있음
+     * - LinkedHashMap은 삽입 순서 유지 → DB 쿼리 결과 순서 그대로 반영
+     *
+     * Example:
+     *   Input:  [{orderId=1, customerName="홍길동", status=10}]  (Integer status)
+     *   Output: [{orderId="1", customerName="홍길동", status="10"}]  (All String)
+     *
+     * Spring 3.2 ASM 호환 (v2.1.3):
+     * - Before: maps.stream().map(m -> {...}).collect(Collectors.toList())
+     * - After: 중첩 for-loop (Lambda 제거)
+     *
+     * @param source MyBatis 조회 결과 (List<Map<String, Object>>, NULL 가능)
+     * @return String으로 변환된 Map 리스트 (LinkedHashMap으로 순서 보장)
+     * @since v2.1.3 (Spring 3.2 호환 for-loop 전환)
+     * @since v2.4.0 (public으로 변경, Pure Function)
+     */
+    public List<Map<String, String>> convertToStringMap(List<Map<String, Object>> source) {
+        List<Map<String, String>> result = new ArrayList<>();
+        if (source == null) {
+            return result;
+        }
+        for (Map<String, Object> map : source) {
+            Map<String, String> stringMap = new LinkedHashMap<>();  // 순서 보장
+            for (Map.Entry<String, Object> entry : map.entrySet()) {
+                stringMap.put(entry.getKey(), entry.getValue() != null ? entry.getValue().toString() : "");
+            }
+            result.add(stringMap);
+        }
+        return result;
+    }
+
+    // ===== Orchestration (통합 테스트 대상) =====
+
     /**
      * 동적 수신인 조회 (사용자 ID + 그룹 통합)
      *
@@ -180,7 +312,7 @@ public class AlarmMailService {
      *
      * Logic Flow:
      * 1. NULL 체크 → 둘 다 NULL이면 ADM 그룹 기본 설정
-     * 2. 콤마 split → trim (정규화는 Recipient 클래스에 위임)
+     * 2. 콤마 split → trim (parseRecipientIds/Groups 사용)
      * 3. MyBatis 통합 쿼리 호출 (alarm.selectRecipientsByConditions)
      * 4. Recipient.fromMapList()로 변환 + 중복 제거
      * 5. 빈 결과 → ValueChainException 발생
@@ -202,6 +334,7 @@ public class AlarmMailService {
      * @since v2.1.0 (동적 수신인 조회 도입)
      * @since v2.1.1 (대소문자 정규화 Recipient 일원화)
      * @since v2.1.3 (Spring 3.2 호환 for-loop 전환)
+     * @since v2.4.0 (parseRecipientIds/Groups Pure Function 사용)
      */
     private List<Recipient> resolveRecipients(String recipientUserIds, String recipientGroups) {
         // 1. NULL 체크 및 기본값 설정 (알람 메일 전용)
@@ -215,29 +348,9 @@ public class AlarmMailService {
             hasGroups = true;
         }
 
-        // 2. 콤마 구분 문자열을 List로 변환 (trim만 수행, 정규화는 Recipient 클래스에서 담당)
-        // Spring 3.2 ASM 호환성을 위해 for-loop 사용 (lambda/method reference 제거)
-        List<String> userIdList = new ArrayList<>();
-        if (hasUserIds) {
-            String[] userIdTokens = recipientUserIds.split(",");
-            for (String token : userIdTokens) {
-                String trimmed = token.trim();
-                if (!trimmed.isEmpty()) {
-                    userIdList.add(trimmed);
-                }
-            }
-        }
-
-        List<String> groupList = new ArrayList<>();
-        if (hasGroups) {
-            String[] groupTokens = recipientGroups.split(",");
-            for (String token : groupTokens) {
-                String trimmed = token.trim();
-                if (!trimmed.isEmpty()) {
-                    groupList.add(trimmed);
-                }
-            }
-        }
+        // 2. 콤마 구분 문자열을 List로 변환 (Pure Function 사용)
+        List<String> userIdList = hasUserIds ? parseRecipientIds(recipientUserIds) : new ArrayList<String>();
+        List<String> groupList = hasGroups ? parseRecipientGroups(recipientGroups) : new ArrayList<String>();
 
         // 3. MyBatis 파라미터 생성
         Map<String, Object> params = new HashMap<>();
@@ -266,40 +379,6 @@ public class AlarmMailService {
                 "(userIds=" + userIdList.size() + ", groups=" + groupList.size() + ")");
 
         return recipients;
-    }
-
-    /**
-     * Map 타입 변환 (Object → String, 테이블 렌더링용)
-     *
-     * MyBatis 조회 결과를 MailRequest.addTableSection()에 전달 가능한 형식으로 변환합니다.
-     *
-     * Why LinkedHashMap:
-     * - MailBodyRenderer가 map.keySet()을 순회하며 테이블 헤더 생성
-     * - HashMap은 순서 미보장 → 컬럼 순서가 매번 변경될 수 있음
-     * - LinkedHashMap은 삽입 순서 유지 → DB 쿼리 결과 순서 그대로 반영
-     *
-     * Example:
-     *   Input:  [{orderId=1, customerName="홍길동", status=10}]  (Integer status)
-     *   Output: [{orderId="1", customerName="홍길동", status="10"}]  (All String)
-     *
-     * Spring 3.2 ASM 호환 (v2.1.3):
-     * - Before: maps.stream().map(m -> {...}).collect(Collectors.toList())
-     * - After: 중첩 for-loop (Lambda 제거)
-     *
-     * @param source MyBatis 조회 결과 (List<Map<String, Object>>)
-     * @return String으로 변환된 Map 리스트 (LinkedHashMap으로 순서 보장)
-     * @since v2.1.3 (Spring 3.2 호환 for-loop 전환)
-     */
-    private List<Map<String, String>> convertToStringMap(List<Map<String, Object>> source) {
-        List<Map<String, String>> result = new ArrayList<>();
-        for (Map<String, Object> map : source) {
-            Map<String, String> stringMap = new LinkedHashMap<>();  // 순서 보장
-            for (Map.Entry<String, Object> entry : map.entrySet()) {
-                stringMap.put(entry.getKey(), entry.getValue() != null ? entry.getValue().toString() : "");
-            }
-            result.add(stringMap);
-        }
-        return result;
     }
 
     private Long getLong(Object value) {

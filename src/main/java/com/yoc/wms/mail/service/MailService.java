@@ -136,6 +136,84 @@ public class MailService {
         }
     }
 
+    // ===== Pure Functions (단위 테스트 대상) =====
+
+    /**
+     * 수신인 이메일 문자열 생성 (Pure Function)
+     *
+     * List<Recipient>를 콤마로 구분된 이메일 문자열로 변환합니다.
+     * MailUtils.formatRecipientsToString()와 동일하지만, Service 레이어에서 재사용을 위해 분리합니다.
+     *
+     * Example:
+     *   Input:  [Recipient("admin@test.com"), Recipient("user@test.com")]
+     *   Output: "admin@test.com,user@test.com"
+     *
+     * @param recipients 수신인 목록 (NULL 가능)
+     * @return 콤마로 구분된 이메일 문자열 (NULL이면 빈 문자열)
+     * @since v2.4.0 (Pure Function 분리)
+     */
+    public String joinRecipientEmails(List<Recipient> recipients) {
+        if (recipients == null || recipients.isEmpty()) {
+            return "";
+        }
+
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < recipients.size(); i++) {
+            if (i > 0) {
+                sb.append(",");
+            }
+            sb.append(recipients.get(i).getEmail());
+        }
+        return sb.toString();
+    }
+
+    /**
+     * 에러 메시지 자르기 (Pure Function)
+     *
+     * DB 컬럼 크기 제한(VARCHAR2(2000))에 맞춰 에러 메시지를 자릅니다.
+     *
+     * Example:
+     *   Input:  "Very long error..." (3000자), maxLength=2000
+     *   Output: "Very long error..." (2000자)
+     *
+     * @param errorMessage 에러 메시지 (NULL 가능)
+     * @param maxLength 최대 길이
+     * @return 잘린 에러 메시지 (NULL이면 NULL 반환)
+     * @since v2.4.0 (Pure Function 분리)
+     */
+    public String truncateErrorMessage(String errorMessage, int maxLength) {
+        if (errorMessage == null) {
+            return null;
+        }
+        if (errorMessage.length() <= maxLength) {
+            return errorMessage;
+        }
+        return errorMessage.substring(0, maxLength);
+    }
+
+    /**
+     * 수신인 목록을 이메일 배열로 변환 (Pure Function)
+     *
+     * JavaMailSender가 String[]을 요구하므로 List<Recipient>를 변환합니다.
+     *
+     * Example:
+     *   Input:  [Recipient("admin@test.com"), Recipient("user@test.com")]
+     *   Output: ["admin@test.com", "user@test.com"]
+     *
+     * @param recipients 수신인 목록 (NULL이나 empty 불가)
+     * @return 이메일 배열
+     * @since v2.4.0 (Pure Function 분리)
+     */
+    public String[] recipientsToEmailArray(List<Recipient> recipients) {
+        String[] emails = new String[recipients.size()];
+        for (int i = 0; i < recipients.size(); i++) {
+            emails[i] = recipients.get(i).getEmail();
+        }
+        return emails;
+    }
+
+    // ===== Orchestration (통합 테스트 대상) =====
+
     /**
      * 발송 로그 생성 (통합)
      */
@@ -223,20 +301,12 @@ public class MailService {
 
         helper.setFrom("wms-noreply@youngone.co.kr", "WMS 시스템");
 
-        // TO 수신인 변환
-        String[] toEmails = new String[recipients.size()];
-        for (int i = 0; i < recipients.size(); i++) {
-            toEmails[i] = recipients.get(i).getEmail();
-        }
-        helper.setTo(toEmails);
+        // TO 수신인 변환 (Pure Function 사용)
+        helper.setTo(recipientsToEmailArray(recipients));
 
-        // CC 수신인 변환
+        // CC 수신인 변환 (Pure Function 사용)
         if (ccRecipients != null && !ccRecipients.isEmpty()) {
-            String[] ccEmails = new String[ccRecipients.size()];
-            for (int i = 0; i < ccRecipients.size(); i++) {
-                ccEmails[i] = ccRecipients.get(i).getEmail();
-            }
-            helper.setCc(ccEmails);
+            helper.setCc(recipientsToEmailArray(ccRecipients));
         }
 
         helper.setSubject(subject);
