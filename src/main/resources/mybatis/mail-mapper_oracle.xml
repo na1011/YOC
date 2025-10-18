@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="mail">
+
+    <!-- ==================== 발송 로그 관련 ==================== -->
+
+    <!-- 발송 로그 INSERT (Oracle 19c) -->
+    <insert id="insertMailSendLog" parameterType="map">
+        INSERT INTO MAIL_SEND_LOG (
+        LOG_ID,
+        MAIL_TYPE,
+        MAIL_SOURCE,
+        SUBJECT,
+        RECIPIENTS,
+        CC_RECIPIENTS,
+        BODY_HTML,
+        SEND_STATUS,
+        ERROR_MESSAGE,
+        RETRY_COUNT,
+        SEND_DATE,
+        SENDER_EMAIL,
+        IP_ADDRESS,
+        REG_DATE
+        ) VALUES (
+        SEQ_MAIL_SEND_LOG.NEXTVAL,
+        #{mailType},
+        #{mailSource},
+        #{subject},
+        #{recipients},
+        #{ccRecipients},
+        #{bodyHtml},
+        #{sendStatus},
+        #{errorMessage},
+        #{retryCount},
+        #{sendDate},
+        #{senderEmail},
+        #{ipAddress},
+        SYSDATE
+        )
+    </insert>
+
+    <!-- 로그 상태 업데이트 -->
+    <update id="updateMailSendLogStatus" parameterType="map">
+        UPDATE MAIL_SEND_LOG
+        SET SEND_STATUS = #{sendStatus},
+            ERROR_MESSAGE = #{errorMessage},
+            SEND_DATE = #{sendDate},
+            UPD_DATE = SYSDATE
+        WHERE LOG_ID = #{logId}
+    </update>
+
+    <!-- 로그 조회 (최근순) -->
+    <select id="selectMailSendLogs" parameterType="map" resultType="map">
+        SELECT LOG_ID       AS logId,
+        MAIL_TYPE    AS mailType,
+        MAIL_SOURCE  AS mailSource,
+        SUBJECT      AS subject,
+        RECIPIENTS   AS recipients,
+        SEND_STATUS  AS sendStatus,
+        SEND_DATE    AS sendDate,
+        REG_DATE     AS regDate
+        FROM MAIL_SEND_LOG
+        <where>
+            <if test="mailType != null">
+                AND MAIL_TYPE = #{mailType}
+            </if>
+            <if test="sendStatus != null">
+                AND SEND_STATUS = #{sendStatus}
+            </if>
+            <if test="startDate != null">
+                AND SEND_DATE >= #{startDate}
+            </if>
+            <if test="endDate != null">
+                AND SEND_DATE <![CDATA[<=]]> #{endDate}
+            </if>
+        </where>
+        ORDER BY SEND_DATE DESC, LOG_ID DESC
+        OFFSET #{offset, jdbcType=INTEGER} ROWS
+        FETCH FIRST #{limit, jdbcType=INTEGER} ROWS ONLY
+    </select>
+
+    <!-- 로그 통계 -->
+    <select id="selectMailSendStats" resultType="map">
+        SELECT MAIL_TYPE                                    AS mailType,
+               COUNT(*)                                     AS totalCount,
+               SUM(CASE WHEN SEND_STATUS = 'SUCCESS' THEN 1 ELSE 0 END) AS successCount,
+               SUM(CASE WHEN SEND_STATUS = 'FAILURE' THEN 1 ELSE 0 END) AS failureCount
+        FROM MAIL_SEND_LOG
+        WHERE SEND_DATE <![CDATA[  >= ]]> SYSDATE - 7
+        GROUP BY MAIL_TYPE
+        ORDER BY MAIL_TYPE
+    </select>
+
+</mapper>
