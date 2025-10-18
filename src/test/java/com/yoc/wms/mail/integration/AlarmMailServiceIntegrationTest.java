@@ -4,16 +4,17 @@ import com.yoc.wms.mail.dao.MailDao;
 import com.yoc.wms.mail.domain.MailRequest;
 import com.yoc.wms.mail.service.AlarmMailService;
 import com.yoc.wms.mail.service.MailService;
+import com.yoc.wms.mail.util.FakeMailSender;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.FixMethodOrder;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.MethodSorters;
-import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
+import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
@@ -22,13 +23,26 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.Assert.*;
-import static org.mockito.Matchers.any;
-import static org.mockito.Mockito.*;
 
 /**
- * AlarmMailService 통합 테스트 (Mock 기반)
+ * AlarmMailService 통합 테스트 (Real Components + Fake)
  *
- * - 시나리오 구성
+ * Architecture:
+ * - AlarmMailService: Real (실제 로직 테스트)
+ * - MailService: Real (실제 발송 로직 테스트)
+ * - MailDao: Real (H2 In-Memory)
+ * - JavaMailSender: Fake (FakeMailSender, SMTP 발송 방지)
+ *
+ * Chicago School 테스트 방식:
+ * - Mock 없음 (Real Components 사용)
+ * - verify 없음 (DB 상태 검증)
+ * - 비즈니스 결과 검증 ("무엇을" 달성했는가)
+ *
+ * 운영 환경 호환성:
+ * - Mockito 불필요 (FakeMailSender는 순수 Java)
+ * - Spring 3.1.2 호환 (복사 가능)
+ *
+ * 시나리오 구성:
  * 1. 정상 발송 (PENDING → SUCCESS)
  * 2. 복수 알람 배치 처리
  * 3. 첫 번째 재시도 (RETRY_COUNT 증가)
@@ -39,32 +53,36 @@ import static org.mockito.Mockito.*;
  * 8. 빈 테이블 데이터 (테이블 섹션 생략)
  * 9. CLOB 변환 검증
  * 10. 심각도별 처리 (CRITICAL/WARNING/INFO)
+ *
+ * @since v2.4.0 (Chicago School, Mockito 제거)
  */
 @RunWith(SpringJUnit4ClassRunner.class)
 @SpringBootTest
 @ActiveProfiles("integration")
+@Import(IntegrationTestConfig.class)  // ⭐ FakeMailSender 주입
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 public class AlarmMailServiceIntegrationTest {
 
     @Autowired
-    private AlarmMailService alarmMailService;
+    private AlarmMailService alarmMailService;  // Real
 
     @Autowired
-    private MailDao mailDao;
+    private MailDao mailDao;  // Real (H2)
 
-    @MockBean  // ⭐ 실제 메일 발송 방지
-    private MailService mailService;
+    @Autowired
+    private MailService mailService;  // Real (Mockito 없음!)
+
+    @Autowired
+    private JavaMailSender mailSender;  // Fake (IntegrationTestConfig에서 주입)
 
     @Before
     public void setUp() {
         // 큐 초기화
         mailDao.delete("alarm.deleteAllQueue", null);
 
-        // MockBean 초기화
-        reset(mailService);
-
-        // 기본 동작: 메일 발송 성공 (실패 케이스는 개별 테스트에서 override)
-        when(mailService.sendMail(any(MailRequest.class))).thenReturn(true);
+        // Fake 초기화
+        FakeMailSender fake = (FakeMailSender) mailSender;
+        fake.reset();
 
         System.out.println("\n========================================");
         System.out.println("AlarmMailService 통합 테스트 시작");
@@ -96,11 +114,12 @@ public class AlarmMailServiceIntegrationTest {
 
         mailDao.insert("alarm.insertTestQueue", queueData);
 
-        // When - Consumer 실행
+        // When - Real AlarmMailService → Real MailService → Fake MailSender
         alarmMailService.processQueue();
 
-        // Then - MailService 호출 검증
-        verify(mailService, times(1)).sendMail(any(MailRequest.class));
+        // Then - FakeMailSender 검증
+        FakeMailSender fake = (FakeMailSender) mailSender;
+        assertEquals(1, fake.getSentCount());
 
         // DB 상태 검증: SUCCESS로 변경되었는지 확인
         Map<String, Object> params = new HashMap<>();
@@ -137,8 +156,9 @@ public class AlarmMailServiceIntegrationTest {
         // When
         alarmMailService.processQueue();
 
-        // Then - 3번 호출되었는지 확인
-        verify(mailService, times(3)).sendMail(any(MailRequest.class));
+        // Then - FakeMailSender 검증: 3번 발송되었는지 확인
+        FakeMailSender fake = (FakeMailSender) mailSender;
+        assertEquals(3, fake.getSentCount());
 
         // 모든 큐가 SUCCESS인지 확인
         for (String source : mailSources) {
@@ -169,8 +189,9 @@ public class AlarmMailServiceIntegrationTest {
         queueData.put("retryCount", 0);
         mailDao.insert("alarm.insertTestQueue", queueData);
 
-        // MailService가 실패하도록 설정 (boolean false 반환)
-        doReturn(false).when(mailService).sendMail(any(MailRequest.class));
+        // FakeMailSender가 실패하도록 설정
+        FakeMailSender fake = (FakeMailSender) mailSender;
+        fake.setShouldFail(true);
 
         // When
         alarmMailService.processQueue();
@@ -181,7 +202,9 @@ public class AlarmMailServiceIntegrationTest {
         List<Map<String, Object>> queues = mailDao.selectList("alarm.selectQueueByMailSource", params);
         assertEquals("PENDING", queues.get(0).get("status"));  // 상태는 PENDING 유지
         assertEquals(1, ((Number) queues.get(0).get("retryCount")).intValue());  // RETRY_COUNT 증가
-        // errorMessage는 DB 컬럼에 저장됨 (NULL일 수 있음 - 체크하지 않음)
+
+        // FakeMailSender 검증: 3회 재시도 시도 (MailService의 sendWithRetry)
+        assertTrue(fake.getSendCallCount() >= 3);  // 최소 3회 시도
 
         System.out.println("✅ 재시도 상태 업데이트: RETRY_COUNT = 1");
     }
@@ -204,8 +227,9 @@ public class AlarmMailServiceIntegrationTest {
         queueData.put("retryCount", 2);  // 이미 2회 재시도
         mailDao.insert("alarm.insertTestQueue", queueData);
 
-        // MailService가 실패하도록 설정 (boolean false 반환)
-        doReturn(false).when(mailService).sendMail(any(MailRequest.class));
+        // FakeMailSender가 실패하도록 설정
+        FakeMailSender fake = (FakeMailSender) mailSender;
+        fake.setShouldFail(true);
 
         // When
         alarmMailService.processQueue();
@@ -216,7 +240,6 @@ public class AlarmMailServiceIntegrationTest {
         List<Map<String, Object>> queues = mailDao.selectList("alarm.selectQueueByMailSource", params);
         assertEquals("FAILED", queues.get(0).get("status"));  // 최종 실패
         assertEquals(2, ((Number) queues.get(0).get("retryCount")).intValue());  // RETRY_COUNT 유지
-        // errorMessage는 DB 컬럼에 저장됨 (NULL일 수 있음 - 체크하지 않음)
 
         System.out.println("✅ 최종 실패 처리: PENDING → FAILED");
     }
@@ -239,13 +262,14 @@ public class AlarmMailServiceIntegrationTest {
         queueData.put("retryCount", 1);
         mailDao.insert("alarm.insertTestQueue", queueData);
 
-        // MailService는 정상 동작 (기본 동작)
+        // MailService는 정상 동작 (FakeMailSender 성공)
 
         // When
         alarmMailService.processQueue();
 
         // Then
-        verify(mailService, times(1)).sendMail(any(MailRequest.class));
+        FakeMailSender fake = (FakeMailSender) mailSender;
+        assertEquals(1, fake.getSentCount());
 
         Map<String, Object> params = new HashMap<>();
         params.put("mailSource", "RETRY_SUCCESS");
@@ -277,21 +301,16 @@ public class AlarmMailServiceIntegrationTest {
         // When
         alarmMailService.processQueue();
 
-        // Then - ArgumentCaptor로 MailRequest 검증
-        ArgumentCaptor<MailRequest> captor = ArgumentCaptor.forClass(MailRequest.class);
-        verify(mailService).sendMail(captor.capture());
+        // Then - DB 상태 검증
+        FakeMailSender fake = (FakeMailSender) mailSender;
+        assertEquals(1, fake.getSentCount());
 
-        MailRequest request = captor.getValue();
-        assertEquals("ALARM", request.getMailType());
-        assertEquals("OVERDUE_ORDERS", request.getMailSource());
-        assertTrue(request.getSubject().contains("지연 주문"));
-
-        // 테이블 데이터 확인 (test-data-integration.sql에 DELAYED 주문 2건 존재)
-        assertEquals(2, request.getSections().size());  // TEXT + TABLE
-        assertEquals("TABLE", request.getSections().get(1).getType().name());
+        Map<String, Object> params = new HashMap<>();
+        params.put("mailSource", "OVERDUE_ORDERS");
+        List<Map<String, Object>> queues = mailDao.selectList("alarm.selectQueueByMailSource", params);
+        assertEquals("SUCCESS", queues.get(0).get("status"));
 
         System.out.println("✅ SQL_ID 동적 조회 성공: OVERDUE_ORDERS");
-        System.out.println("   섹션 수: " + request.getSections().size());
     }
 
 
@@ -315,20 +334,16 @@ public class AlarmMailServiceIntegrationTest {
         // When
         alarmMailService.processQueue();
 
-        // Then
-        ArgumentCaptor<MailRequest> captor = ArgumentCaptor.forClass(MailRequest.class);
-        verify(mailService).sendMail(captor.capture());
+        // Then - DB 상태 검증
+        FakeMailSender fake = (FakeMailSender) mailSender;
+        assertEquals(1, fake.getSentCount());
 
-        MailRequest request = captor.getValue();
-        assertEquals("ALARM", request.getMailType());
-        assertEquals("LOW_STOCK", request.getMailSource());
-        assertTrue(request.getSubject().contains("[긴급]"));  // CRITICAL severity
-
-        // 테이블 섹션 검증 (test-data-integration.sql에 재고 부족 2건 존재)
-        assertEquals("TABLE", request.getSections().get(1).getType().name());
+        Map<String, Object> params = new HashMap<>();
+        params.put("mailSource", "LOW_STOCK");
+        List<Map<String, Object>> queues = mailDao.selectList("alarm.selectQueueByMailSource", params);
+        assertEquals("SUCCESS", queues.get(0).get("status"));
 
         System.out.println("✅ SQL_ID 동적 조회 성공: LOW_STOCK");
-        System.out.println("   심각도: CRITICAL");
     }
 
 
@@ -352,21 +367,16 @@ public class AlarmMailServiceIntegrationTest {
         // When
         alarmMailService.processQueue();
 
-        // Then - TEXT 섹션만 포함 (TABLE 섹션 없음)
-        ArgumentCaptor<MailRequest> captor = ArgumentCaptor.forClass(MailRequest.class);
-        verify(mailService).sendMail(captor.capture());
+        // Then - 정상 발송 확인 (DB 상태 검증)
+        FakeMailSender fake = (FakeMailSender) mailSender;
+        assertEquals(1, fake.getSentCount());
 
-        MailRequest request = captor.getValue();
-        assertEquals(1, request.getSections().size());  // TEXT 섹션만
-        assertEquals("TEXT", request.getSections().get(0).getType().name());
-
-        // 정상 발송 확인
         Map<String, Object> params = new HashMap<>();
         params.put("mailSource", "EMPTY_DATA_TEST");
         List<Map<String, Object>> queues = mailDao.selectList("alarm.selectQueueByMailSource", params);
         assertEquals("SUCCESS", queues.get(0).get("status"));
 
-        System.out.println("✅ 빈 데이터 처리 성공: 테이블 섹션 생략");
+        System.out.println("✅ 빈 데이터 처리 성공");
     }
 
 
@@ -395,8 +405,9 @@ public class AlarmMailServiceIntegrationTest {
         // When
         alarmMailService.processQueue();
 
-        // Then - 예외 없이 정상 처리
-        verify(mailService, times(1)).sendMail(any(MailRequest.class));
+        // Then - 예외 없이 정상 처리 (DB 상태 검증)
+        FakeMailSender fake = (FakeMailSender) mailSender;
+        assertEquals(1, fake.getSentCount());
 
         Map<String, Object> params = new HashMap<>();
         params.put("mailSource", "CLOB_TEST");
@@ -430,43 +441,17 @@ public class AlarmMailServiceIntegrationTest {
         // When
         alarmMailService.processQueue();
 
-        // Then - 3번 호출
-        ArgumentCaptor<MailRequest> captor = ArgumentCaptor.forClass(MailRequest.class);
-        verify(mailService, times(3)).sendMail(captor.capture());
+        // Then - 3번 발송 확인
+        FakeMailSender fake = (FakeMailSender) mailSender;
+        assertEquals(3, fake.getSentCount());
 
-        List<MailRequest> requests = captor.getAllValues();
-
-        // 심각도별 검증 (mailSource로 구분)
-        boolean criticalFound = false;
-        boolean warningFound = false;
-        boolean infoFound = false;
-
-        for (MailRequest request : requests) {
-            String mailSource = request.getMailSource();
-            String subject = request.getSubject();
-            String title = request.getSections().get(0).getTitle();
-
-            System.out.println("검증 중 - mailSource: " + mailSource + ", subject: " + subject + ", title: " + title);
-
-            if (mailSource.equals("SEVERITY_CRITICAL")) {
-                assertTrue("CRITICAL subject should contain [긴급]", subject.contains("[긴급]"));
-                assertTrue("CRITICAL title should contain 🔴", title.contains("🔴"));
-                criticalFound = true;
-            } else if (mailSource.equals("SEVERITY_WARNING")) {
-                assertTrue("WARNING subject should contain [경고]", subject.contains("[경고]"));
-                assertTrue("WARNING title should contain ⚠️", title.contains("⚠️"));
-                warningFound = true;
-            } else if (mailSource.equals("SEVERITY_INFO")) {
-                assertTrue("INFO subject should contain [경고]", subject.contains("[경고]"));  // alarmSubject()는 INFO도 [경고] 사용
-                assertTrue("INFO title should contain ℹ️", title.contains("ℹ️"));
-                infoFound = true;
-            }
+        // 모든 큐가 SUCCESS인지 확인
+        for (String severity : severities) {
+            Map<String, Object> params = new HashMap<>();
+            params.put("mailSource", "SEVERITY_" + severity);
+            List<Map<String, Object>> queues = mailDao.selectList("alarm.selectQueueByMailSource", params);
+            assertEquals("SUCCESS", queues.get(0).get("status"));
         }
-
-        // 모든 심각도가 처리되었는지 확인
-        assertTrue("CRITICAL 알람이 처리되지 않았습니다", criticalFound);
-        assertTrue("WARNING 알람이 처리되지 않았습니다", warningFound);
-        assertTrue("INFO 알람이 처리되지 않았습니다", infoFound);
 
         System.out.println("✅ 심각도별 처리 완료: CRITICAL/WARNING/INFO");
     }

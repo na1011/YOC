@@ -4,23 +4,39 @@ import com.yoc.wms.mail.dao.MailDao;
 import com.yoc.wms.mail.domain.MailRequest;
 import com.yoc.wms.mail.domain.Recipient;
 import com.yoc.wms.mail.service.MailService;
+import com.yoc.wms.mail.util.FakeMailSender;
 import org.junit.*;
 import org.junit.runner.RunWith;
 import org.junit.runners.MethodSorters;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.Assert.*;
 
 /**
- * MailService 실제 메일 발송 테스트
+ * MailService 통합 테스트 (Real Components + Fake)
  *
- * - 시나리오 구성
+ * Architecture:
+ * - MailService: Real (실제 발송 로직 테스트)
+ * - MailDao: Real (H2 In-Memory)
+ * - JavaMailSender: Fake (FakeMailSender, SMTP 발송 방지)
+ *
+ * Chicago School 테스트 방식:
+ * - Mock 없음 (Real Components 사용)
+ * - verify 없음 (FakeMailSender count 검증)
+ * - 비즈니스 결과 검증 ("무엇을" 달성했는가)
+ *
+ * 운영 환경 호환성:
+ * - Mockito 불필요 (FakeMailSender는 순수 Java)
+ * - Spring 3.1.2 호환 (복사 가능)
+ *
+ * 시나리오 구성:
  * 1. 단일 섹션 메일 (텍스트만)
  * 2. 복수 섹션 메일 (텍스트 + 테이블 + 구분선 + 텍스트) - 범용 Builder 사용
  * 3. 알람 메일 (Helper Methods 사용)
@@ -28,19 +44,24 @@ import static org.junit.Assert.*;
  * 5. 공지 메일 (Helper Methods 사용)
  * 6. CC 포함 메일
  * 7. 발송 로그 검증
+ *
+ * @since v2.4.0 (Chicago School, Mockito 제거)
  */
 @RunWith(SpringJUnit4ClassRunner.class)
 @SpringBootTest
 @ActiveProfiles("integration")
+@Import(IntegrationTestConfig.class)  // ⭐ FakeMailSender 주입
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
-@Ignore("실제 메일 발송 테스트 - 필요 시 @Ignore 제거 후 실행")
 public class MailServiceIntegrationTest {
 
     @Autowired
-    private MailService mailService;
+    private MailService mailService;  // Real
 
     @Autowired
-    private MailDao mailDao;
+    private MailDao mailDao;  // Real (H2)
+
+    @Autowired
+    private JavaMailSender mailSender;  // Fake (IntegrationTestConfig에서 주입)
 
     private List<Recipient> testRecipients;
 
@@ -50,14 +71,18 @@ public class MailServiceIntegrationTest {
         testRecipients = new ArrayList<>();
         testRecipients.add(Recipient.builder()
             .userId("ADMIN")
-            .email("chanki_kim@youngone.co.kr")
+            .email("admin@company.com")
             .group("ADM")
             .build());
         testRecipients.add(Recipient.builder()
             .userId("USER")
-            .email("seongbin_heo@test.co.kr")
+            .email("user@company.com")
             .group("USER")
             .build());
+
+        // Fake 초기화
+        FakeMailSender fake = (FakeMailSender) mailSender;
+        fake.reset();
 
         System.out.println("\n========================================");
         System.out.println("MailService 통합 테스트 시작");
@@ -66,10 +91,8 @@ public class MailServiceIntegrationTest {
     }
 
     @After
-    public void tearDown() throws InterruptedException {
-        // 메일 발송 후 대기 (비동기 처리 완료 대기)
-        System.out.println("\n메일 발송 완료 대기 중 (5초)...\n");
-        TimeUnit.SECONDS.sleep(5);
+    public void tearDown() {
+        System.out.println("\n테스트 종료\n");
     }
 
     // ==================== 시나리오 1: 단일 섹션 (텍스트만) ====================
@@ -91,17 +114,20 @@ public class MailServiceIntegrationTest {
 
         // When
         System.out.println("메일 발송 중...");
-        mailService.sendMail(request);
+        boolean result = mailService.sendMail(request);
 
         // Then
-        System.out.println("✅ 메일 발송 요청 완료");
-        System.out.println("수신자: chanki_kim@youngone.co.kr, zerus94@naver.com");
-        System.out.println("제목: [통합테스트] 단일 섹션 메일");
+        assertTrue("메일 발송 성공", result);
+
+        FakeMailSender fake = (FakeMailSender) mailSender;
+        assertEquals(1, fake.getSentCount());
 
         // 발송 로그 확인
         List<Map<String, Object>> logs = mailDao.selectList("mail.selectRecentMailLogs", null);
         assertNotNull(logs);
         assertFalse("발송 로그가 생성되어야 함", logs.isEmpty());
+
+        System.out.println("✅ 메일 발송 완료");
     }
 
     // ==================== 시나리오 2: 복수 섹션 (범용 Builder) ====================
@@ -152,11 +178,15 @@ public class MailServiceIntegrationTest {
 
         // When
         System.out.println("메일 발송 중...");
-        mailService.sendMail(request);
+        boolean result = mailService.sendMail(request);
 
         // Then
-        System.out.println("✅ 메일 발송 요청 완료");
-        System.out.println("제목: [통합테스트] 복수 섹션 메일");
+        assertTrue("메일 발송 성공", result);
+
+        FakeMailSender fake = (FakeMailSender) mailSender;
+        assertEquals(1, fake.getSentCount());
+
+        System.out.println("✅ 메일 발송 완료");
         System.out.println("섹션 수: 4개 (TEXT + TABLE + DIVIDER + TEXT)");
     }
 
@@ -200,14 +230,16 @@ public class MailServiceIntegrationTest {
 
         // When
         System.out.println("메일 발송 중...");
-        mailService.sendMail(request);
+        boolean result = mailService.sendMail(request);
 
         // Then
-        System.out.println("✅ 메일 발송 요청 완료");
-        System.out.println("수신자: chanki_kim@youngone.co.kr, zerus94@naver.com");
-        System.out.println("제목: [경고] WMS 재고 부족 알림 " + tableData.size() + "건");
-        System.out.println("심각도: WARNING");
-        System.out.println("테이블 행 수: " + tableData.size());
+        assertTrue("메일 발송 성공", result);
+
+        FakeMailSender fake = (FakeMailSender) mailSender;
+        assertEquals(1, fake.getSentCount());
+
+        System.out.println("✅ 메일 발송 완료");
+        System.out.println("심각도: WARNING, 테이블 행 수: " + tableData.size());
     }
 
     // ==================== 시나리오 4: 보고서 메일 (Helper Methods) ====================
@@ -248,12 +280,15 @@ public class MailServiceIntegrationTest {
 
         // When
         System.out.println("메일 발송 중...");
-        mailService.sendMail(request);
+        boolean result = mailService.sendMail(request);
 
         // Then
-        System.out.println("✅ 메일 발송 요청 완료");
-        System.out.println("수신자: chanki_kim@youngone.co.kr, zerus94@naver.com");
-        System.out.println("제목: 지연 주문 현황 보고서");
+        assertTrue("메일 발송 성공", result);
+
+        FakeMailSender fake = (FakeMailSender) mailSender;
+        assertEquals(1, fake.getSentCount());
+
+        System.out.println("✅ 메일 발송 완료");
         System.out.println("테이블 행 수: " + reportData.size());
     }
 
@@ -283,12 +318,15 @@ public class MailServiceIntegrationTest {
 
         // When
         System.out.println("메일 발송 중...");
-        mailService.sendMail(request);
+        boolean result = mailService.sendMail(request);
 
         // Then
-        System.out.println("✅ 메일 발송 요청 완료");
-        System.out.println("수신자: chanki_kim@youngone.co.kr, zerus94@naver.com");
-        System.out.println("제목: 시스템 정기 점검 안내");
+        assertTrue("메일 발송 성공", result);
+
+        FakeMailSender fake = (FakeMailSender) mailSender;
+        assertEquals(1, fake.getSentCount());
+
+        System.out.println("✅ 메일 발송 완료");
         System.out.println("유형: NOTICE");
     }
 
@@ -302,14 +340,14 @@ public class MailServiceIntegrationTest {
         List<Recipient> toRecipients = Collections.singletonList(
             Recipient.builder()
                 .userId("ADMIN")
-                .email("chanki_kim@youngone.co.kr")
+                .email("admin@company.com")
                 .group("ADM")
                 .build()
         );
         List<Recipient> ccRecipients = Collections.singletonList(
             Recipient.builder()
                 .userId("USER")
-                .email("zerus94@naver.com")
+                .email("user@company.com")
                 .group("USER")
                 .build()
         );
@@ -318,8 +356,8 @@ public class MailServiceIntegrationTest {
             .subject("[통합테스트] CC 포함 테스트 메일")
             .addTextSection("CC 기능 테스트",
                 "이 메일은 CC 기능을 테스트하기 위해 발송되었습니다.\n\n" +
-                "TO: chanki_kim@youngone.co.kr (ADMIN)\n" +
-                "CC: zerus94@naver.com (USER)\n\n" +
+                "TO: admin@company.com (ADMIN)\n" +
+                "CC: user@company.com (USER)\n\n" +
                 "양쪽 모두 수신 확인 부탁드립니다.")
             .recipients(toRecipients)
             .ccRecipients(ccRecipients)
@@ -328,47 +366,42 @@ public class MailServiceIntegrationTest {
 
         // When
         System.out.println("메일 발송 중...");
-        mailService.sendMail(request);
+        boolean result = mailService.sendMail(request);
 
         // Then
-        System.out.println("✅ 메일 발송 요청 완료");
-        System.out.println("TO: chanki_kim@youngone.co.kr");
-        System.out.println("CC: zerus94@naver.com");
+        assertTrue("메일 발송 성공", result);
+
+        FakeMailSender fake = (FakeMailSender) mailSender;
+        assertEquals(1, fake.getSentCount());
+
+        System.out.println("✅ 메일 발송 완료 (CC 포함)");
     }
 
     // ==================== 시나리오 7: 발송 로그 검증 ====================
 
     @Test
-    public void test07_scenario7_verifyMailLogs() throws InterruptedException {
+    public void test07_scenario7_verifyMailLogs() {
         System.out.println("\n[시나리오 7] 발송 로그 검증");
 
-        // Given - 이전 테스트들의 메일 발송 완료 대기
-        TimeUnit.SECONDS.sleep(10);
+        // Given - 테스트 메일 1건 발송
+        MailRequest request = MailRequest.builder()
+            .subject("[통합테스트] 로그 검증용 메일")
+            .addTextSection("로그 검증", "발송 로그가 정상적으로 기록되는지 확인합니다.")
+            .recipients(testRecipients)
+            .mailType("DIRECT")
+            .build();
+
+        mailService.sendMail(request);
 
         // When - 발송 로그 조회
         List<Map<String, Object>> logs = mailDao.selectList("mail.selectRecentMailLogs", null);
 
         // Then
-        System.out.println("\n발송 로그 조회 결과:");
-        System.out.println("총 로그 수: " + logs.size());
-
-        for (Map<String, Object> log : logs) {
-            System.out.println("\n----------------------------------------");
-            System.out.println("제목: " + log.get("subject"));
-            System.out.println("수신자: " + log.get("recipients"));
-            System.out.println("상태: " + log.get("sendStatus"));
-            System.out.println("발송시간: " + log.get("sendDate"));
-            if (log.get("ccRecipients") != null) {
-                System.out.println("CC: " + log.get("ccRecipients"));
-            }
-        }
-
-        // 검증
         assertNotNull("발송 로그가 존재해야 함", logs);
-        assertTrue("최소 1건 이상의 발송 로그가 있어야 함", logs.size() >= 1);
+        assertFalse("최소 1건 이상의 발송 로그가 있어야 함", logs.isEmpty());
 
         // 모든 메일이 SUCCESS 상태인지 확인 (for-loop 사용)
-        long successCount = 0;
+        int successCount = 0;
         for (Map<String, Object> log : logs) {
             if ("SUCCESS".equals(log.get("sendStatus"))) {
                 successCount++;
@@ -379,5 +412,7 @@ public class MailServiceIntegrationTest {
         System.out.println("전체 로그: " + logs.size() + "건");
         System.out.println("성공: " + successCount + "건");
         System.out.println("========================================");
+
+        assertTrue("성공 로그가 1건 이상 있어야 함", successCount >= 1);
     }
 }
