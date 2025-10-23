@@ -71,7 +71,7 @@ public class MailServiceIntegrationTest {
         testRecipients = new ArrayList<>();
         testRecipients.add(Recipient.builder()
             .userId("ADMIN")
-            .email("admin@company.com")
+            .email("chanki_kim@youngone.co.kr")
             .group("ADM")
             .build());
         testRecipients.add(Recipient.builder()

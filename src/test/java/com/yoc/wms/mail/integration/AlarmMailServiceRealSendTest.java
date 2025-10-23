@@ -26,7 +26,7 @@ import java.util.concurrent.TimeUnit;
 @SpringBootTest
 @ActiveProfiles("integration")
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
-@Ignore("실제 메일 발송 테스트 - 필요 시 @Ignore 제거 후 실행")
+//@Ignore("실제 메일 발송 테스트 - 필요 시 @Ignore 제거 후 실행")
 public class AlarmMailServiceRealSendTest {
 
     @Autowired
