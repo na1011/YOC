@@ -8,23 +8,24 @@
 
     <!-- 큐 조회 (PENDING 상태) -->
     <select id="selectPendingQueue" parameterType="map" resultType="map">
-        SELECT QUEUE_ID            AS queueId,
-               MAIL_SOURCE         AS mailSource,
-               ALARM_NAME          AS alarmName,
-               SEVERITY            AS severity,
-               SQL_ID              AS sqlId,
-               SECTION_TITLE       AS sectionTitle,
-               SECTION_CONTENT     AS sectionContent,
-               RECIPIENT_USER_IDS  AS recipientUserIds,
-               RECIPIENT_GROUPS    AS recipientGroups,
-               STATUS              AS status,
-               RETRY_COUNT         AS retryCount,
-               ERROR_MESSAGE       AS errorMessage,
-               REG_DATE            AS regDate
+        SELECT QUEUE_ID,
+               MAIL_SOURCE,
+               ALARM_NAME,
+               SEVERITY,
+               SQL_ID,
+               SECTION_TITLE,
+               SECTION_CONTENT,
+               RECIPIENT_USER_IDS,
+               RECIPIENT_GROUPS,
+               COLUMN_ORDER,
+               STATUS,
+               RETRY_COUNT,
+               ERROR_MESSAGE,
+               REG_DATE
         FROM MAIL_QUEUE
         WHERE STATUS = 'PENDING'
-        ORDER BY REG_DATE ASC<if test="limit != null">
-        FETCH FIRST #{limit} ROWS ONLY</if>
+        ORDER BY REG_DATE ASC<if test="LIMIT != null">
+        FETCH FIRST #{LIMIT} ROWS ONLY</if>
     </select>
 
     <!-- 큐 상태 업데이트: SUCCESS -->
@@ -32,25 +33,25 @@
         UPDATE MAIL_QUEUE
         SET STATUS = 'SUCCESS',
             UPD_DATE = SYSDATE
-        WHERE QUEUE_ID = #{queueId}
+        WHERE QUEUE_ID = #{QUEUE_ID}
     </update>
 
     <!-- 큐 상태 업데이트: RETRY -->
     <update id="updateQueueRetry" parameterType="map">
         UPDATE MAIL_QUEUE
         SET RETRY_COUNT = RETRY_COUNT + 1,
-            ERROR_MESSAGE = #{errorMessage},
+            ERROR_MESSAGE = #{ERROR_MESSAGE},
             UPD_DATE = SYSDATE
-        WHERE QUEUE_ID = #{queueId}
+        WHERE QUEUE_ID = #{QUEUE_ID}
     </update>
 
     <!-- 큐 상태 업데이트: FAILED -->
     <update id="updateQueueFailed" parameterType="map">
         UPDATE MAIL_QUEUE
         SET STATUS = 'FAILED',
-            ERROR_MESSAGE = #{errorMessage},
+            ERROR_MESSAGE = #{ERROR_MESSAGE},
             UPD_DATE = SYSDATE
-        WHERE QUEUE_ID = #{queueId}
+        WHERE QUEUE_ID = #{QUEUE_ID}
     </update>
 
     <!-- 큐 정리 (완료된 항목 삭제) -->
@@ -65,10 +66,10 @@
 
     <!-- 지연 주문 상세 조회 -->
     <select id="selectOverdueOrdersDetail" resultType="map">
-        SELECT ORDER_ID      AS orderId,
-               CUSTOMER_NAME AS customer,
-               TO_CHAR(ORDER_DATE, 'YYYY-MM-DD') AS orderDate,
-               DAYS_OVERDUE  AS daysOverdue
+        SELECT ORDER_ID,
+               CUSTOMER_NAME AS CUSTOMER,
+               TO_CHAR(ORDER_DATE, 'YYYY-MM-DD') AS ORDER_DATE,
+               DAYS_OVERDUE
         FROM ORDERS
         WHERE STATUS = 'OVERDUE'
           AND DAYS_OVERDUE <![CDATA[>=]]> 5
@@ -77,11 +78,11 @@
 
     <!-- 재고 부족 상세 조회 -->
     <select id="selectLowStockDetail" resultType="map">
-        SELECT WAREHOUSE_CODE AS warehouseCode,
-               PRODUCT_CODE   AS productCode,
-               PRODUCT_NAME   AS productName,
-               STOCK_QTY      AS currentStock,
-               MIN_STOCK_QTY  AS minStock
+        SELECT WAREHOUSE_CODE,
+               PRODUCT_CODE,
+               PRODUCT_NAME,
+               STOCK_QTY      AS CURRENT_STOCK,
+               MIN_STOCK_QTY  AS MIN_STOCK
         FROM INVENTORY
         WHERE STOCK_QTY <![CDATA[<]]> MIN_STOCK_QTY
         ORDER BY STOCK_QTY ASC
@@ -92,10 +93,10 @@
 
     <!-- ADM 그룹 사용자 조회 -->
     <select id="selectAdmGroup" resultType="map">
-        SELECT USER_ID   AS userId,
-               USER_NAME AS userName,
-               EMAIL     AS email,
-               USER_GROUP AS userGroup
+        SELECT USER_ID,
+               USER_NAME,
+               EMAIL,
+               USER_GROUP
         FROM USER_INFO
         WHERE USER_GROUP = 'ADM'
           AND EMAIL IS NOT NULL
@@ -104,12 +105,12 @@
 
     <!-- 특정 그룹 사용자 조회 -->
     <select id="selectUsersByGroup" parameterType="string" resultType="map">
-        SELECT USER_ID   AS userId,
-               USER_NAME AS userName,
-               EMAIL     AS email,
-               USER_GROUP AS userGroup
+        SELECT USER_ID,
+               USER_NAME,
+               EMAIL,
+               USER_GROUP
         FROM USER_INFO
-        WHERE USER_GROUP = #{userGroup}
+        WHERE USER_GROUP = #{USER_GROUP}
           AND EMAIL IS NOT NULL
         ORDER BY USER_NAME
     </select>
@@ -117,27 +118,27 @@
     <!-- 수신인 통합 조회 (사용자 ID + 그룹, DISTINCT로 중복 제거) -->
     <select id="selectRecipientsByConditions" parameterType="map" resultType="map">
         SELECT DISTINCT
-               EMAIL       AS email,
-               USER_ID     AS userId,
-               USER_NAME   AS userName,
-               USER_GROUP  AS userGroup
+               EMAIL,
+               USER_ID,
+               USER_NAME,
+               USER_GROUP
         FROM USER_INFO
         WHERE EMAIL IS NOT NULL
-        <if test="userIds != null or groups != null">
+        <if test="USER_IDS != null or GROUPS != null">
           AND (
-            <if test="userIds != null and userIds.size() > 0">
+            <if test="USER_IDS != null and USER_IDS.size() > 0">
                 USER_ID IN
-                <foreach collection="userIds" item="userId" open="(" separator="," close=")">
-                    #{userId}
+                <foreach collection="USER_IDS" item="USER_ID" open="(" separator="," close=")">
+                    #{USER_ID}
                 </foreach>
             </if>
-            <if test="userIds != null and userIds.size() > 0 and groups != null and groups.size() > 0">
+            <if test="USER_IDS != null and USER_IDS.size() > 0 and GROUPS != null and GROUPS.size() > 0">
                 OR
             </if>
-            <if test="groups != null and groups.size() > 0">
+            <if test="GROUPS != null and GROUPS.size() > 0">
                 USER_GROUP IN
-                <foreach collection="groups" item="group" open="(" separator="," close=")">
-                    #{group}
+                <foreach collection="GROUPS" item="GROUP" open="(" separator="," close=")">
+                    #{GROUP}
                 </foreach>
             </if>
           )

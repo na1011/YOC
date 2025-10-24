@@ -29,13 +29,13 @@ public class Recipient {
      * - Service/SQL 계층에서는 trim만 수행, 정규화는 이 메서드에서 일원화
      *
      * Map 구조:
-     *   {userId: String, email: String, group: String}
+     *   {USER_ID: String, EMAIL: String, USER_GROUP: String}
      *
      * Example:
      *   Map<String, Object> map = new HashMap<>();
-     *   map.put("userId", "admin");       // 소문자 입력
-     *   map.put("email", "Admin@Test.Co.Kr");  // 대소문자 혼용
-     *   map.put("group", "ADM");
+     *   map.put("USER_ID", "admin");       // 소문자 입력
+     *   map.put("EMAIL", "Admin@Test.Co.Kr");  // 대소문자 혼용
+     *   map.put("USER_GROUP", "ADM");
      *
      *   Recipient r = Recipient.fromMap(map);
      *   // r.getUserId() = "ADMIN" (대문자)
@@ -46,9 +46,9 @@ public class Recipient {
      * @since v2.1.1 (대소문자 정규화 일원화)
      */
     public static Recipient fromMap(Map<String, Object> map) {
-        String userId = (String) map.get("userId");    // user → userId
-        String email = (String) map.get("email");
-        String group = (String) map.get("group");
+        String userId = (String) map.get("USER_ID");
+        String email = (String) map.get("EMAIL");
+        String group = (String) map.get("USER_GROUP");
 
         // USER_ID 대문자 정규화 (대소문자 안전성)
         if (userId != null) {

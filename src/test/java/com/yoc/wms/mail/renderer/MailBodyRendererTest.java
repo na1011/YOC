@@ -614,6 +614,216 @@ public class MailBodyRendererTest {
         assertTrue(html.length() > 10000);
     }
 
+    // ==================== columnOrder 메타데이터 테스트 (v2.5.0) ====================
+
+    @Test
+    public void table_withColumnOrder() {
+        // Given - 특정 순서로 컬럼 렌더링
+        Map<String, String> row = new LinkedHashMap<>();
+        row.put("ORDER_ID", "ORD-001");
+        row.put("CUSTOMER", "홍길동");
+        row.put("ORDER_DATE", "2025-01-15");
+        row.put("DAYS_OVERDUE", "5");
+
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("columnOrder", "ORDER_ID,CUSTOMER,ORDER_DATE,DAYS_OVERDUE");
+
+        MailSection section = MailSection.builder()
+            .type(SectionType.TABLE)
+            .data(Collections.singletonList(row))
+            .metadata(metadata)
+            .build();
+
+        // When
+        String html = renderer.render(Collections.singletonList(section));
+
+        // Then - 컬럼이 지정된 순서대로 렌더링되어야 함
+        assertTrue(html.contains("ORDER_ID"));
+        assertTrue(html.contains("CUSTOMER"));
+        assertTrue(html.contains("ORDER_DATE"));
+        assertTrue(html.contains("DAYS_OVERDUE"));
+
+        // 순서 확인: ORDER_ID가 CUSTOMER보다 먼저 나와야 함
+        int orderIdPos = html.indexOf("ORDER_ID");
+        int customerPos = html.indexOf("CUSTOMER");
+        int orderDatePos = html.indexOf("ORDER_DATE");
+        int daysOverduePos = html.indexOf("DAYS_OVERDUE");
+
+        assertTrue(orderIdPos < customerPos);
+        assertTrue(customerPos < orderDatePos);
+        assertTrue(orderDatePos < daysOverduePos);
+    }
+
+    @Test
+    public void table_withColumnOrder_partialColumns() {
+        // Given - columnOrder에 일부 컬럼만 지정 (나머지는 무시됨)
+        Map<String, String> row = new LinkedHashMap<>();
+        row.put("col1", "A");
+        row.put("col2", "B");
+        row.put("col3", "C");
+        row.put("col4", "D");
+
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("columnOrder", "col2,col4");  // col1, col3는 제외
+
+        MailSection section = MailSection.builder()
+            .type(SectionType.TABLE)
+            .data(Collections.singletonList(row))
+            .metadata(metadata)
+            .build();
+
+        // When
+        String html = renderer.render(Collections.singletonList(section));
+
+        // Then - col2와 col4만 렌더링되어야 함
+        assertTrue(html.contains("col2"));
+        assertTrue(html.contains("col4"));
+        assertTrue(html.contains(">B<"));
+        assertTrue(html.contains(">D<"));
+
+        // col1과 col3는 렌더링되지 않음 (순서에 포함되지 않음)
+        assertFalse(html.contains("col1"));
+        assertFalse(html.contains("col3"));
+    }
+
+    @Test
+    public void table_withColumnOrder_nonExistentColumns() {
+        // Given - columnOrder에 존재하지 않는 컬럼 지정
+        Map<String, String> row = new LinkedHashMap<>();
+        row.put("col1", "A");
+        row.put("col2", "B");
+
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("columnOrder", "col1,nonExistent,col2");
+
+        MailSection section = MailSection.builder()
+            .type(SectionType.TABLE)
+            .data(Collections.singletonList(row))
+            .metadata(metadata)
+            .build();
+
+        // When
+        String html = renderer.render(Collections.singletonList(section));
+
+        // Then - 존재하는 컬럼만 렌더링
+        assertTrue(html.contains("col1"));
+        assertTrue(html.contains("col2"));
+        assertFalse(html.contains("nonExistent"));
+    }
+
+    @Test
+    public void table_withColumnOrder_emptyString() {
+        // Given - columnOrder가 빈 문자열
+        Map<String, String> row = new LinkedHashMap<>();
+        row.put("col1", "A");
+        row.put("col2", "B");
+
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("columnOrder", "   ");  // 빈 문자열
+
+        MailSection section = MailSection.builder()
+            .type(SectionType.TABLE)
+            .data(Collections.singletonList(row))
+            .metadata(metadata)
+            .build();
+
+        // When
+        String html = renderer.render(Collections.singletonList(section));
+
+        // Then - 빈 문자열은 무시되고 기존 keySet() 순서로 렌더링
+        assertTrue(html.contains("col1"));
+        assertTrue(html.contains("col2"));
+    }
+
+    @Test
+    public void table_withColumnOrder_null() {
+        // Given - columnOrder가 null (기본 동작)
+        Map<String, String> row = new LinkedHashMap<>();
+        row.put("col1", "A");
+        row.put("col2", "B");
+
+        MailSection section = MailSection.builder()
+            .type(SectionType.TABLE)
+            .data(Collections.singletonList(row))
+            .build();
+
+        // When
+        String html = renderer.render(Collections.singletonList(section));
+
+        // Then - 기존 keySet() 순서로 렌더링
+        assertTrue(html.contains("col1"));
+        assertTrue(html.contains("col2"));
+    }
+
+    @Test
+    public void table_withColumnOrder_withWhitespace() {
+        // Given - columnOrder에 공백 포함
+        Map<String, String> row = new LinkedHashMap<>();
+        row.put("col1", "A");
+        row.put("col2", "B");
+        row.put("col3", "C");
+
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("columnOrder", "col1 , col2 , col3");  // 공백 포함
+
+        MailSection section = MailSection.builder()
+            .type(SectionType.TABLE)
+            .data(Collections.singletonList(row))
+            .metadata(metadata)
+            .build();
+
+        // When
+        String html = renderer.render(Collections.singletonList(section));
+
+        // Then - trim되어 정상 렌더링
+        assertTrue(html.contains("col1"));
+        assertTrue(html.contains("col2"));
+        assertTrue(html.contains("col3"));
+
+        // 순서 확인
+        int col1Pos = html.indexOf("col1");
+        int col2Pos = html.indexOf("col2");
+        int col3Pos = html.indexOf("col3");
+
+        assertTrue(col1Pos < col2Pos);
+        assertTrue(col2Pos < col3Pos);
+    }
+
+    @Test
+    public void table_withColumnOrder_multipleRows() {
+        // Given - 여러 행에 columnOrder 적용
+        Map<String, String> row1 = new LinkedHashMap<>();
+        row1.put("ORDER_ID", "ORD-001");
+        row1.put("CUSTOMER", "홍길동");
+        row1.put("amount", "10000");
+
+        Map<String, String> row2 = new LinkedHashMap<>();
+        row2.put("ORDER_ID", "ORD-002");
+        row2.put("CUSTOMER", "김철수");
+        row2.put("amount", "20000");
+
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("columnOrder", "CUSTOMER,ORDER_ID,amount");  // 순서 변경
+
+        MailSection section = MailSection.builder()
+            .type(SectionType.TABLE)
+            .data(Arrays.asList(row1, row2))
+            .metadata(metadata)
+            .build();
+
+        // When
+        String html = renderer.render(Collections.singletonList(section));
+
+        // Then - 모든 행이 같은 컬럼 순서로 렌더링
+        assertTrue(html.contains("홍길동"));
+        assertTrue(html.contains("김철수"));
+
+        // 헤더 순서 확인: CUSTOMER가 ORDER_ID보다 먼저
+        int customerHeaderPos = html.indexOf("CUSTOMER");
+        int orderIdHeaderPos = html.indexOf("ORDER_ID");
+        assertTrue(customerHeaderPos < orderIdHeaderPos);
+    }
+
     // ==================== forContact() Factory Method 테스트 ====================
 
     @Test

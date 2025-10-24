@@ -56,6 +56,7 @@ CREATE TABLE MAIL_QUEUE (
                             SECTION_CONTENT     CLOB,
                             RECIPIENT_USER_IDS  VARCHAR2(1000),
                             RECIPIENT_GROUPS    VARCHAR2(1000),
+                            COLUMN_ORDER        VARCHAR2(500),
                             STATUS              VARCHAR2(20)    NOT NULL CHECK (STATUS IN ('PENDING', 'SUCCESS', 'FAILED')),
                             RETRY_COUNT         NUMBER          DEFAULT 0,
                             ERROR_MESSAGE       VARCHAR2(2000),
@@ -74,6 +75,7 @@ COMMENT ON COLUMN MAIL_QUEUE.SECTION_TITLE IS '메일 본문 섹션 소제목';
 COMMENT ON COLUMN MAIL_QUEUE.SECTION_CONTENT IS '메일 본문 섹션 내용 (TEXT)';
 COMMENT ON COLUMN MAIL_QUEUE.RECIPIENT_USER_IDS IS '수신 사용자 ID (콤마 구분, NULL 가능, 예: USER001,USER002)';
 COMMENT ON COLUMN MAIL_QUEUE.RECIPIENT_GROUPS IS '수신 그룹 (콤마 구분, NULL 가능, 둘 다 NULL이면 ADM 기본, 예: ADM,SALES)';
+COMMENT ON COLUMN MAIL_QUEUE.COLUMN_ORDER IS '테이블 컬럼 순서 (콤마 구분, NULL 가능, 예: orderId,customer,orderDate)';
 
 
 -- ==================== 4. 사용자 정보 (테스트용) ====================

@@ -6,6 +6,7 @@ import com.yoc.wms.mail.exception.ValueChainException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -106,6 +107,7 @@ public class MailBodyRenderer {
         boolean striped = "true".equals(section.getMetadataOrDefault("striped", "false"));
         String headerBgColor = section.getMetadataOrDefault("headerBgColor", mailConfig.getTableHeaderBgColor());
         String headerTextColor = section.getMetadataOrDefault("headerTextColor", mailConfig.getTableHeaderTextColor());
+        String columnOrder = section.getMetadataOrDefault("columnOrder", null);
 
         // 테이블
         String tableStyle = String.format("width: 100%%; border-collapse: collapse; %s",
@@ -120,20 +122,32 @@ public class MailBodyRenderer {
         if (data != null && !data.isEmpty()) {
             Map<String, String> firstRow = data.get(0);
 
+            // 컬럼 순서 결정
+            List<String> columns;
+            if (columnOrder != null && !columnOrder.trim().isEmpty()) {
+                // columnOrder가 지정된 경우: 지정된 순서 사용
+                columns = parseColumnOrder(columnOrder);
+            } else {
+                // columnOrder가 없는 경우: 기존 keySet() 순회 (무작위)
+                columns = new ArrayList<>(firstRow.keySet());
+            }
+
             // 헤더
             html.append("<thead>");
             html.append("<tr style='background-color: ").append(headerBgColor)
                     .append("; color: ").append(headerTextColor).append(";'>");
 
-            for (String header : firstRow.keySet()) {
-                String thStyle = String.format("padding: %s; text-align: left; font-weight: bold;",
-                        mailConfig.getDefaultPadding());
-                if (bordered) {
-                    thStyle += String.format(" border: 1px solid %s;", mailConfig.getTableBorderColor());
+            for (String header : columns) {
+                if (firstRow.containsKey(header)) {
+                    String thStyle = String.format("padding: %s; text-align: left; font-weight: bold;",
+                            mailConfig.getDefaultPadding());
+                    if (bordered) {
+                        thStyle += String.format(" border: 1px solid %s;", mailConfig.getTableBorderColor());
+                    }
+                    html.append("<th style='").append(thStyle).append("'>");
+                    html.append(escapeHtml(header));
+                    html.append("</th>");
                 }
-                html.append("<th style='").append(thStyle).append("'>");
-                html.append(escapeHtml(header));
-                html.append("</th>");
             }
 
             html.append("</tr>");
@@ -152,15 +166,18 @@ public class MailBodyRenderer {
 
                 html.append("<tr style='").append(rowBgColor).append("'>");
 
-                for (String value : row.values()) {
-                    String tdStyle = String.format("padding: %s; text-align: left;",
-                            mailConfig.getDefaultPadding());
-                    if (bordered) {
-                        tdStyle += String.format(" border: 1px solid %s;", mailConfig.getTableBorderColor());
+                for (String columnName : columns) {
+                    if (row.containsKey(columnName)) {
+                        String value = row.get(columnName);
+                        String tdStyle = String.format("padding: %s; text-align: left;",
+                                mailConfig.getDefaultPadding());
+                        if (bordered) {
+                            tdStyle += String.format(" border: 1px solid %s;", mailConfig.getTableBorderColor());
+                        }
+                        html.append("<td style='").append(tdStyle).append("'>");
+                        html.append(escapeHtml(value));
+                        html.append("</td>");
                     }
-                    html.append("<td style='").append(tdStyle).append("'>");
-                    html.append(escapeHtml(value));
-                    html.append("</td>");
                 }
 
                 html.append("</tr>");
@@ -173,6 +190,28 @@ public class MailBodyRenderer {
         html.append("</div>");
 
         return html.toString();
+    }
+
+    /**
+     * 컬럼 순서 파싱 (콤마 구분 문자열 → List)
+     *
+     * @param columnOrder 콤마 구분 컬럼 순서 (예: "orderId,customer,orderDate")
+     * @return 컬럼 이름 리스트
+     */
+    private List<String> parseColumnOrder(String columnOrder) {
+        List<String> result = new ArrayList<>();
+        if (columnOrder == null || columnOrder.trim().isEmpty()) {
+            return result;
+        }
+
+        String[] tokens = columnOrder.split(",");
+        for (String token : tokens) {
+            String trimmed = token.trim();
+            if (!trimmed.isEmpty()) {
+                result.add(trimmed);
+            }
+        }
+        return result;
     }
 
     /**

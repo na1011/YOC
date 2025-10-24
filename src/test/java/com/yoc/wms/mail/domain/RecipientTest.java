@@ -68,9 +68,9 @@ public class RecipientTest {
         // fromMap: 정상 변환 - 모든 필드
         // Given
         Map<String, Object> map = new HashMap<String, Object>();
-        map.put("userId", "kim456");
-        map.put("email", "kim@company.com");
-        map.put("group", "DEV");
+        map.put("USER_ID", "kim456");
+        map.put("EMAIL", "kim@company.com");
+        map.put("USER_GROUP", "DEV");
 
         // When
         Recipient recipient = Recipient.fromMap(map);
@@ -86,8 +86,8 @@ public class RecipientTest {
         // fromMap: 일부 필드 누락
         // Given
         Map<String, Object> map = new HashMap<String, Object>();
-        map.put("userId", "user2");
-        map.put("email", "user2@company.com");
+        map.put("USER_ID", "user2");
+        map.put("EMAIL", "user2@company.com");
 
         // When
         Recipient recipient = Recipient.fromMap(map);
@@ -134,9 +134,9 @@ public class RecipientTest {
         // fromMap: 값이 null
         // Given
         Map<String, Object> map = new HashMap<String, Object>();
-        map.put("userId", null);
-        map.put("email", null);
-        map.put("group", null);
+        map.put("USER_ID", null);
+        map.put("EMAIL", null);
+        map.put("USER_GROUP", null);
 
         // When
         Recipient recipient = Recipient.fromMap(map);
@@ -270,21 +270,21 @@ public class RecipientTest {
         List<Map<String, Object>> maps = new ArrayList<Map<String, Object>>();
 
         Map<String, Object> map1 = new HashMap<String, Object>();
-        map1.put("userId", "admin");
-        map1.put("email", "admin@company.com");
-        map1.put("group", "ADM");
+        map1.put("USER_ID", "admin");
+        map1.put("EMAIL", "admin@company.com");
+        map1.put("USER_GROUP", "ADM");
         maps.add(map1);
 
         Map<String, Object> map2 = new HashMap<String, Object>();
-        map2.put("userId", "user1");
-        map2.put("email", "user1@company.com");
-        map2.put("group", "USER");
+        map2.put("USER_ID", "user1");
+        map2.put("EMAIL", "user1@company.com");
+        map2.put("USER_GROUP", "USER");
         maps.add(map2);
 
         Map<String, Object> map3 = new HashMap<String, Object>();
-        map3.put("userId", "user2");
-        map3.put("email", "user2@company.com");
-        map3.put("group", "USER");
+        map3.put("USER_ID", "user2");
+        map3.put("EMAIL", "user2@company.com");
+        map3.put("USER_GROUP", "USER");
         maps.add(map3);
 
         // When
@@ -332,21 +332,21 @@ public class RecipientTest {
         List<Map<String, Object>> maps = new ArrayList<Map<String, Object>>();
 
         Map<String, Object> map1 = new HashMap<String, Object>();
-        map1.put("userId", "admin1");
-        map1.put("email", "admin@company.com");
-        map1.put("group", "ADM");
+        map1.put("USER_ID", "admin1");
+        map1.put("EMAIL", "admin@company.com");
+        map1.put("USER_GROUP", "ADM");
         maps.add(map1);
 
         Map<String, Object> map2 = new HashMap<String, Object>();
-        map2.put("userId", "admin2");
-        map2.put("email", "admin@company.com");  // 동일한 이메일 (중복)
-        map2.put("group", "ADM");
+        map2.put("USER_ID", "admin2");
+        map2.put("EMAIL", "admin@company.com");  // 동일한 이메일 (중복)
+        map2.put("USER_GROUP", "ADM");
         maps.add(map2);
 
         Map<String, Object> map3 = new HashMap<String, Object>();
-        map3.put("userId", "user1");
-        map3.put("email", "user@company.com");
-        map3.put("group", "USER");
+        map3.put("USER_ID", "user1");
+        map3.put("EMAIL", "user@company.com");
+        map3.put("USER_GROUP", "USER");
         maps.add(map3);
 
         // When
@@ -365,15 +365,15 @@ public class RecipientTest {
         List<Map<String, Object>> maps = new ArrayList<Map<String, Object>>();
 
         Map<String, Object> map1 = new HashMap<String, Object>();
-        map1.put("userId", "admin1");
-        map1.put("email", "Admin@Company.com");  // 대문자 포함
-        map1.put("group", "ADM");
+        map1.put("USER_ID", "admin1");
+        map1.put("EMAIL", "Admin@Company.com");  // 대문자 포함
+        map1.put("USER_GROUP", "ADM");
         maps.add(map1);
 
         Map<String, Object> map2 = new HashMap<String, Object>();
-        map2.put("userId", "admin2");
-        map2.put("email", "admin@company.com");  // 소문자 (동일 이메일)
-        map2.put("group", "ADM");
+        map2.put("USER_ID", "admin2");
+        map2.put("EMAIL", "admin@company.com");  // 소문자 (동일 이메일)
+        map2.put("USER_GROUP", "ADM");
         maps.add(map2);
 
         // When
@@ -391,15 +391,15 @@ public class RecipientTest {
         List<Map<String, Object>> maps = new ArrayList<Map<String, Object>>();
 
         Map<String, Object> map1 = new HashMap<String, Object>();
-        map1.put("userId", "admin");  // 소문자
-        map1.put("email", "admin@company.com");
-        map1.put("group", "ADM");
+        map1.put("USER_ID", "admin");  // 소문자
+        map1.put("EMAIL", "admin@company.com");
+        map1.put("USER_GROUP", "ADM");
         maps.add(map1);
 
         Map<String, Object> map2 = new HashMap<String, Object>();
-        map2.put("userId", "UsEr1");  // 혼용
-        map2.put("email", "user1@company.com");
-        map2.put("group", "USER");
+        map2.put("USER_ID", "UsEr1");  // 혼용
+        map2.put("EMAIL", "user1@company.com");
+        map2.put("USER_GROUP", "USER");
         maps.add(map2);
 
         // When
@@ -418,18 +418,18 @@ public class RecipientTest {
         List<Map<String, Object>> maps = new ArrayList<Map<String, Object>>();
 
         Map<String, Object> map1 = new HashMap<String, Object>();
-        map1.put("userId", "user1");
-        map1.put("email", "user1@company.com");
+        map1.put("USER_ID", "user1");
+        map1.put("EMAIL", "user1@company.com");
         maps.add(map1);
 
         Map<String, Object> map2 = new HashMap<String, Object>();
-        map2.put("userId", "user2");
-        map2.put("email", "user2@company.com");
+        map2.put("USER_ID", "user2");
+        map2.put("EMAIL", "user2@company.com");
         maps.add(map2);
 
         Map<String, Object> map3 = new HashMap<String, Object>();
-        map3.put("userId", "user3");
-        map3.put("email", "user3@company.com");
+        map3.put("USER_ID", "user3");
+        map3.put("EMAIL", "user3@company.com");
         maps.add(map3);
 
         // When
@@ -448,13 +448,13 @@ public class RecipientTest {
         List<Map<String, Object>> maps = new ArrayList<Map<String, Object>>();
 
         Map<String, Object> map1 = new HashMap<String, Object>();
-        map1.put("userId", "admin");
-        map1.put("email", "admin@company.com");
+        map1.put("USER_ID", "admin");
+        map1.put("EMAIL", "admin@company.com");
         // group 없음
         maps.add(map1);
 
         Map<String, Object> map2 = new HashMap<String, Object>();
-        map2.put("email", "user@company.com");
+        map2.put("EMAIL", "user@company.com");
         // userId, group 없음
         maps.add(map2);
 

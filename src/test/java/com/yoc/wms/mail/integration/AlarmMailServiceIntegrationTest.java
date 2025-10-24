@@ -104,13 +104,13 @@ public class AlarmMailServiceIntegrationTest {
 
         // Given - Producer 시뮬레이션: 큐에 PENDING 알람 삽입
         Map<String, Object> queueData = new HashMap<>();
-        queueData.put("mailSource", "TEST_ALARM");
-        queueData.put("alarmName", "테스트 알람");
-        queueData.put("severity", "INFO");
-        queueData.put("sqlId", "alarm.selectOverdueOrdersDetail");
-        queueData.put("sectionTitle", "지연 주문 알림");
-        queueData.put("sectionContent", "지연된 주문이 발견되었습니다.");
-        queueData.put("retryCount", 0);
+        queueData.put("MAIL_SOURCE", "TEST_ALARM");
+        queueData.put("ALARM_NAME", "테스트 알람");
+        queueData.put("SEVERITY", "INFO");
+        queueData.put("SQL_ID", "alarm.selectOverdueOrdersDetail");
+        queueData.put("SECTION_TITLE", "지연 주문 알림");
+        queueData.put("SECTION_CONTENT", "지연된 주문이 발견되었습니다.");
+        queueData.put("RETRY_COUNT", 0);
 
         mailDao.insert("alarm.insertTestQueue", queueData);
 
@@ -123,11 +123,11 @@ public class AlarmMailServiceIntegrationTest {
 
         // DB 상태 검증: SUCCESS로 변경되었는지 확인
         Map<String, Object> params = new HashMap<>();
-        params.put("mailSource", "TEST_ALARM");
+        params.put("MAIL_SOURCE", "TEST_ALARM");
         List<Map<String, Object>> queues = mailDao.selectList("alarm.selectQueueByMailSource", params);
         assertEquals(1, queues.size());
-        assertEquals("SUCCESS", queues.get(0).get("status"));
-        assertEquals(0, ((Number) queues.get(0).get("retryCount")).intValue());
+        assertEquals("SUCCESS", queues.get(0).get("STATUS"));
+        assertEquals(0, ((Number) queues.get(0).get("RETRY_COUNT")).intValue());
 
         System.out.println("✅ 정상 발송 완료: PENDING → SUCCESS");
     }
@@ -143,13 +143,13 @@ public class AlarmMailServiceIntegrationTest {
         String[] mailSources = {"OVERDUE_ORDERS", "LOW_STOCK", "SYSTEM_ERROR"};
         for (String source : mailSources) {
             Map<String, Object> queueData = new HashMap<>();
-            queueData.put("mailSource", source);
-            queueData.put("alarmName", source + " 알람");
-            queueData.put("severity", "WARNING");
-            queueData.put("sqlId", "alarm.selectOverdueOrdersDetail");
-            queueData.put("sectionTitle", source + " 발생");
-            queueData.put("sectionContent", source + " 상세 내용");
-            queueData.put("retryCount", 0);
+            queueData.put("MAIL_SOURCE", source);
+            queueData.put("ALARM_NAME", source + " 알람");
+            queueData.put("SEVERITY", "WARNING");
+            queueData.put("SQL_ID", "alarm.selectOverdueOrdersDetail");
+            queueData.put("SECTION_TITLE", source + " 발생");
+            queueData.put("SECTION_CONTENT", source + " 상세 내용");
+            queueData.put("RETRY_COUNT", 0);
             mailDao.insert("alarm.insertTestQueue", queueData);
         }
 
@@ -163,9 +163,9 @@ public class AlarmMailServiceIntegrationTest {
         // 모든 큐가 SUCCESS인지 확인
         for (String source : mailSources) {
             Map<String, Object> params = new HashMap<>();
-            params.put("mailSource", source);
+            params.put("MAIL_SOURCE", source);
             List<Map<String, Object>> queues = mailDao.selectList("alarm.selectQueueByMailSource", params);
-            assertEquals("SUCCESS", queues.get(0).get("status"));
+            assertEquals("SUCCESS", queues.get(0).get("STATUS"));
         }
 
         System.out.println("✅ 배치 처리 완료: 3건 모두 SUCCESS");
@@ -180,13 +180,13 @@ public class AlarmMailServiceIntegrationTest {
 
         // Given - 큐 삽입
         Map<String, Object> queueData = new HashMap<>();
-        queueData.put("mailSource", "RETRY_TEST");
-        queueData.put("alarmName", "재시도 테스트");
-        queueData.put("severity", "WARNING");
-        queueData.put("sqlId", "alarm.selectOverdueOrdersDetail");
-        queueData.put("sectionTitle", "재시도 테스트");
-        queueData.put("sectionContent", "재시도 시나리오");
-        queueData.put("retryCount", 0);
+        queueData.put("MAIL_SOURCE", "RETRY_TEST");
+        queueData.put("ALARM_NAME", "재시도 테스트");
+        queueData.put("SEVERITY", "WARNING");
+        queueData.put("SQL_ID", "alarm.selectOverdueOrdersDetail");
+        queueData.put("SECTION_TITLE", "재시도 테스트");
+        queueData.put("SECTION_CONTENT", "재시도 시나리오");
+        queueData.put("RETRY_COUNT", 0);
         mailDao.insert("alarm.insertTestQueue", queueData);
 
         // FakeMailSender가 실패하도록 설정
@@ -198,10 +198,10 @@ public class AlarmMailServiceIntegrationTest {
 
         // Then - 재시도 상태 확인
         Map<String, Object> params = new HashMap<>();
-        params.put("mailSource", "RETRY_TEST");
+        params.put("MAIL_SOURCE", "RETRY_TEST");
         List<Map<String, Object>> queues = mailDao.selectList("alarm.selectQueueByMailSource", params);
-        assertEquals("PENDING", queues.get(0).get("status"));  // 상태는 PENDING 유지
-        assertEquals(1, ((Number) queues.get(0).get("retryCount")).intValue());  // RETRY_COUNT 증가
+        assertEquals("PENDING", queues.get(0).get("STATUS"));  // 상태는 PENDING 유지
+        assertEquals(1, ((Number) queues.get(0).get("RETRY_COUNT")).intValue());  // RETRY_COUNT 증가
 
         // FakeMailSender 검증: 3회 재시도 시도 (MailService의 sendWithRetry)
         assertTrue(fake.getSendCallCount() >= 3);  // 최소 3회 시도
@@ -218,13 +218,13 @@ public class AlarmMailServiceIntegrationTest {
 
         // Given - RETRY_COUNT = 2인 큐 삽입 (이번 시도가 3번째)
         Map<String, Object> queueData = new HashMap<>();
-        queueData.put("mailSource", "FINAL_FAILURE");
-        queueData.put("alarmName", "최종 실패 테스트");
-        queueData.put("severity", "CRITICAL");
-        queueData.put("sqlId", "alarm.selectOverdueOrdersDetail");
-        queueData.put("sectionTitle", "최종 실패");
-        queueData.put("sectionContent", "3회 재시도 실패");
-        queueData.put("retryCount", 2);  // 이미 2회 재시도
+        queueData.put("MAIL_SOURCE", "FINAL_FAILURE");
+        queueData.put("ALARM_NAME", "최종 실패 테스트");
+        queueData.put("SEVERITY", "CRITICAL");
+        queueData.put("SQL_ID", "alarm.selectOverdueOrdersDetail");
+        queueData.put("SECTION_TITLE", "최종 실패");
+        queueData.put("SECTION_CONTENT", "3회 재시도 실패");
+        queueData.put("RETRY_COUNT", 2);  // 이미 2회 재시도
         mailDao.insert("alarm.insertTestQueue", queueData);
 
         // FakeMailSender가 실패하도록 설정
@@ -236,10 +236,10 @@ public class AlarmMailServiceIntegrationTest {
 
         // Then - FAILED 상태 확인
         Map<String, Object> params = new HashMap<>();
-        params.put("mailSource", "FINAL_FAILURE");
+        params.put("MAIL_SOURCE", "FINAL_FAILURE");
         List<Map<String, Object>> queues = mailDao.selectList("alarm.selectQueueByMailSource", params);
-        assertEquals("FAILED", queues.get(0).get("status"));  // 최종 실패
-        assertEquals(2, ((Number) queues.get(0).get("retryCount")).intValue());  // RETRY_COUNT 유지
+        assertEquals("FAILED", queues.get(0).get("STATUS"));  // 최종 실패
+        assertEquals(2, ((Number) queues.get(0).get("RETRY_COUNT")).intValue());  // RETRY_COUNT 유지
 
         System.out.println("✅ 최종 실패 처리: PENDING → FAILED");
     }
@@ -253,13 +253,13 @@ public class AlarmMailServiceIntegrationTest {
 
         // Given - RETRY_COUNT = 1인 큐 삽입 (이전에 1회 실패)
         Map<String, Object> queueData = new HashMap<>();
-        queueData.put("mailSource", "RETRY_SUCCESS");
-        queueData.put("alarmName", "재시도 성공 테스트");
-        queueData.put("severity", "WARNING");
-        queueData.put("sqlId", "alarm.selectOverdueOrdersDetail");
-        queueData.put("sectionTitle", "재시도 성공");
-        queueData.put("sectionContent", "이번엔 성공");
-        queueData.put("retryCount", 1);
+        queueData.put("MAIL_SOURCE", "RETRY_SUCCESS");
+        queueData.put("ALARM_NAME", "재시도 성공 테스트");
+        queueData.put("SEVERITY", "WARNING");
+        queueData.put("SQL_ID", "alarm.selectOverdueOrdersDetail");
+        queueData.put("SECTION_TITLE", "재시도 성공");
+        queueData.put("SECTION_CONTENT", "이번엔 성공");
+        queueData.put("RETRY_COUNT", 1);
         mailDao.insert("alarm.insertTestQueue", queueData);
 
         // MailService는 정상 동작 (FakeMailSender 성공)
@@ -272,10 +272,10 @@ public class AlarmMailServiceIntegrationTest {
         assertEquals(1, fake.getSentCount());
 
         Map<String, Object> params = new HashMap<>();
-        params.put("mailSource", "RETRY_SUCCESS");
+        params.put("MAIL_SOURCE", "RETRY_SUCCESS");
         List<Map<String, Object>> queues = mailDao.selectList("alarm.selectQueueByMailSource", params);
-        assertEquals("SUCCESS", queues.get(0).get("status"));
-        assertEquals(1, ((Number) queues.get(0).get("retryCount")).intValue());  // RETRY_COUNT 유지 (성공 시 증가 안 함)
+        assertEquals("SUCCESS", queues.get(0).get("STATUS"));
+        assertEquals(1, ((Number) queues.get(0).get("RETRY_COUNT")).intValue());  // RETRY_COUNT 유지 (성공 시 증가 안 함)
 
         System.out.println("✅ 재시도 후 성공: Resilience 검증 완료");
     }
@@ -289,13 +289,13 @@ public class AlarmMailServiceIntegrationTest {
 
         // Given - OVERDUE_ORDERS 큐 삽입
         Map<String, Object> queueData = new HashMap<>();
-        queueData.put("mailSource", "OVERDUE_ORDERS");
-        queueData.put("alarmName", "지연 주문 알림");
-        queueData.put("severity", "WARNING");
-        queueData.put("sqlId", "alarm.selectOverdueOrdersDetail");  // 실제 쿼리 ID
-        queueData.put("sectionTitle", "지연 주문 현황");
-        queueData.put("sectionContent", "지연된 주문을 확인해주세요.");
-        queueData.put("retryCount", 0);
+        queueData.put("MAIL_SOURCE", "OVERDUE_ORDERS");
+        queueData.put("ALARM_NAME", "지연 주문 알림");
+        queueData.put("SEVERITY", "WARNING");
+        queueData.put("SQL_ID", "alarm.selectOverdueOrdersDetail");  // 실제 쿼리 ID
+        queueData.put("SECTION_TITLE", "지연 주문 현황");
+        queueData.put("SECTION_CONTENT", "지연된 주문을 확인해주세요.");
+        queueData.put("RETRY_COUNT", 0);
         mailDao.insert("alarm.insertTestQueue", queueData);
 
         // When
@@ -306,9 +306,9 @@ public class AlarmMailServiceIntegrationTest {
         assertEquals(1, fake.getSentCount());
 
         Map<String, Object> params = new HashMap<>();
-        params.put("mailSource", "OVERDUE_ORDERS");
+        params.put("MAIL_SOURCE", "OVERDUE_ORDERS");
         List<Map<String, Object>> queues = mailDao.selectList("alarm.selectQueueByMailSource", params);
-        assertEquals("SUCCESS", queues.get(0).get("status"));
+        assertEquals("SUCCESS", queues.get(0).get("STATUS"));
 
         System.out.println("✅ SQL_ID 동적 조회 성공: OVERDUE_ORDERS");
     }
@@ -322,13 +322,13 @@ public class AlarmMailServiceIntegrationTest {
 
         // Given
         Map<String, Object> queueData = new HashMap<>();
-        queueData.put("mailSource", "LOW_STOCK");
-        queueData.put("alarmName", "재고 부족 알림");
-        queueData.put("severity", "CRITICAL");
-        queueData.put("sqlId", "alarm.selectLowStockDetail");
-        queueData.put("sectionTitle", "재고 부족 현황");
-        queueData.put("sectionContent", "긴급 재고 보충이 필요합니다.");
-        queueData.put("retryCount", 0);
+        queueData.put("MAIL_SOURCE", "LOW_STOCK");
+        queueData.put("ALARM_NAME", "재고 부족 알림");
+        queueData.put("SEVERITY", "CRITICAL");
+        queueData.put("SQL_ID", "alarm.selectLowStockDetail");
+        queueData.put("SECTION_TITLE", "재고 부족 현황");
+        queueData.put("SECTION_CONTENT", "긴급 재고 보충이 필요합니다.");
+        queueData.put("RETRY_COUNT", 0);
         mailDao.insert("alarm.insertTestQueue", queueData);
 
         // When
@@ -339,9 +339,9 @@ public class AlarmMailServiceIntegrationTest {
         assertEquals(1, fake.getSentCount());
 
         Map<String, Object> params = new HashMap<>();
-        params.put("mailSource", "LOW_STOCK");
+        params.put("MAIL_SOURCE", "LOW_STOCK");
         List<Map<String, Object>> queues = mailDao.selectList("alarm.selectQueueByMailSource", params);
-        assertEquals("SUCCESS", queues.get(0).get("status"));
+        assertEquals("SUCCESS", queues.get(0).get("STATUS"));
 
         System.out.println("✅ SQL_ID 동적 조회 성공: LOW_STOCK");
     }
@@ -355,13 +355,13 @@ public class AlarmMailServiceIntegrationTest {
 
         // Given - 결과가 0건인 SQL_ID
         Map<String, Object> queueData = new HashMap<>();
-        queueData.put("mailSource", "EMPTY_DATA_TEST");
-        queueData.put("alarmName", "빈 데이터 테스트");
-        queueData.put("severity", "INFO");
-        queueData.put("sqlId", "alarm.selectNonExistentData");  // 빈 결과 쿼리
-        queueData.put("sectionTitle", "빈 데이터 테스트");
-        queueData.put("sectionContent", "테이블 데이터가 없는 경우");
-        queueData.put("retryCount", 0);
+        queueData.put("MAIL_SOURCE", "EMPTY_DATA_TEST");
+        queueData.put("ALARM_NAME", "빈 데이터 테스트");
+        queueData.put("SEVERITY", "INFO");
+        queueData.put("SQL_ID", "alarm.selectNonExistentData");  // 빈 결과 쿼리
+        queueData.put("SECTION_TITLE", "빈 데이터 테스트");
+        queueData.put("SECTION_CONTENT", "테이블 데이터가 없는 경우");
+        queueData.put("RETRY_COUNT", 0);
         mailDao.insert("alarm.insertTestQueue", queueData);
 
         // When
@@ -372,9 +372,9 @@ public class AlarmMailServiceIntegrationTest {
         assertEquals(1, fake.getSentCount());
 
         Map<String, Object> params = new HashMap<>();
-        params.put("mailSource", "EMPTY_DATA_TEST");
+        params.put("MAIL_SOURCE", "EMPTY_DATA_TEST");
         List<Map<String, Object>> queues = mailDao.selectList("alarm.selectQueueByMailSource", params);
-        assertEquals("SUCCESS", queues.get(0).get("status"));
+        assertEquals("SUCCESS", queues.get(0).get("STATUS"));
 
         System.out.println("✅ 빈 데이터 처리 성공");
     }
@@ -393,13 +393,13 @@ public class AlarmMailServiceIntegrationTest {
         }
 
         Map<String, Object> queueData = new HashMap<>();
-        queueData.put("mailSource", "CLOB_TEST");
-        queueData.put("alarmName", "CLOB 테스트");
-        queueData.put("severity", "INFO");
-        queueData.put("sqlId", "alarm.selectOverdueOrdersDetail");
-        queueData.put("sectionTitle", "CLOB 변환 테스트");
-        queueData.put("sectionContent", longContent.toString());  // 긴 텍스트
-        queueData.put("retryCount", 0);
+        queueData.put("MAIL_SOURCE", "CLOB_TEST");
+        queueData.put("ALARM_NAME", "CLOB 테스트");
+        queueData.put("SEVERITY", "INFO");
+        queueData.put("SQL_ID", "alarm.selectOverdueOrdersDetail");
+        queueData.put("SECTION_TITLE", "CLOB 변환 테스트");
+        queueData.put("SECTION_CONTENT", longContent.toString());  // 긴 텍스트
+        queueData.put("RETRY_COUNT", 0);
         mailDao.insert("alarm.insertTestQueue", queueData);
 
         // When
@@ -410,9 +410,9 @@ public class AlarmMailServiceIntegrationTest {
         assertEquals(1, fake.getSentCount());
 
         Map<String, Object> params = new HashMap<>();
-        params.put("mailSource", "CLOB_TEST");
+        params.put("MAIL_SOURCE", "CLOB_TEST");
         List<Map<String, Object>> queues = mailDao.selectList("alarm.selectQueueByMailSource", params);
-        assertEquals("SUCCESS", queues.get(0).get("status"));
+        assertEquals("SUCCESS", queues.get(0).get("STATUS"));
 
         System.out.println("✅ CLOB 변환 성공: 예외 없음");
     }
@@ -428,13 +428,13 @@ public class AlarmMailServiceIntegrationTest {
         String[] severities = {"CRITICAL", "WARNING", "INFO"};
         for (String severity : severities) {
             Map<String, Object> queueData = new HashMap<>();
-            queueData.put("mailSource", "SEVERITY_" + severity);
-            queueData.put("alarmName", severity + " 알람");
-            queueData.put("severity", severity);
-            queueData.put("sqlId", "alarm.selectOverdueOrdersDetail");
-            queueData.put("sectionTitle", severity + " 테스트");
-            queueData.put("sectionContent", severity + " 심각도 테스트");
-            queueData.put("retryCount", 0);
+            queueData.put("MAIL_SOURCE", "SEVERITY_" + severity);
+            queueData.put("ALARM_NAME", severity + " 알람");
+            queueData.put("SEVERITY", severity);
+            queueData.put("SQL_ID", "alarm.selectOverdueOrdersDetail");
+            queueData.put("SECTION_TITLE", severity + " 테스트");
+            queueData.put("SECTION_CONTENT", severity + " 심각도 테스트");
+            queueData.put("RETRY_COUNT", 0);
             mailDao.insert("alarm.insertTestQueue", queueData);
         }
 
@@ -448,9 +448,9 @@ public class AlarmMailServiceIntegrationTest {
         // 모든 큐가 SUCCESS인지 확인
         for (String severity : severities) {
             Map<String, Object> params = new HashMap<>();
-            params.put("mailSource", "SEVERITY_" + severity);
+            params.put("MAIL_SOURCE", "SEVERITY_" + severity);
             List<Map<String, Object>> queues = mailDao.selectList("alarm.selectQueueByMailSource", params);
-            assertEquals("SUCCESS", queues.get(0).get("status"));
+            assertEquals("SUCCESS", queues.get(0).get("STATUS"));
         }
 
         System.out.println("✅ 심각도별 처리 완료: CRITICAL/WARNING/INFO");

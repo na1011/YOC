@@ -51,7 +51,7 @@ public class AlarmMailService {
         try {
             // 배치 크기 제한 (긴 트랜잭션 방지)
             Map<String, Object> params = new HashMap<>();
-            params.put("limit", 10);
+            params.put("LIMIT", 10);
             List<Map<String, Object>> messages = mailDao.selectList("alarm.selectPendingQueue", params);
 
             if (messages == null || messages.isEmpty()) {
@@ -76,28 +76,30 @@ public class AlarmMailService {
      * 개별 메시지 처리
      *
      * QUEUE에서 읽은 데이터 구조:
-     *  - queueId: QUEUE_ID
-     *  - mailSource: MAIL_SOURCE (예: OVERDUE_ORDERS)
-     *  - alarmName: ALARM_NAME (예: 지연 주문 알림)
-     *  - severity: SEVERITY (INFO/WARNING/CRITICAL)
-     *  - sqlId: SQL_ID (예: alarm.selectOverdueOrdersDetail)
-     *  - sectionTitle: SECTION_TITLE (Procedure가 작성한 소제목)
-     *  - sectionContent: SECTION_CONTENT (Procedure가 작성한 본문)
-     *  - recipientUserIds: RECIPIENT_USER_IDS (콤마 구분 사용자 ID, NULL 가능)
-     *  - recipientGroups: RECIPIENT_GROUPS (콤마 구분 그룹, NULL 가능)
+     *  - QUEUE_ID: QUEUE_ID
+     *  - MAIL_SOURCE: MAIL_SOURCE (예: OVERDUE_ORDERS)
+     *  - ALARM_NAME: ALARM_NAME (예: 지연 주문 알림)
+     *  - SEVERITY: SEVERITY (INFO/WARNING/CRITICAL)
+     *  - SQL_ID: SQL_ID (예: alarm.selectOverdueOrdersDetail)
+     *  - SECTION_TITLE: SECTION_TITLE (Procedure가 작성한 소제목)
+     *  - SECTION_CONTENT: SECTION_CONTENT (Procedure가 작성한 본문)
+     *  - RECIPIENT_USER_IDS: RECIPIENT_USER_IDS (콤마 구분 사용자 ID, NULL 가능)
+     *  - RECIPIENT_GROUPS: RECIPIENT_GROUPS (콤마 구분 그룹, NULL 가능)
+     *  - COLUMN_ORDER: COLUMN_ORDER (콤마 구분 컬럼 순서, NULL 가능)
      */
     private void processMessage(Map<String, Object> msg) {
-        Long queueId = getLong(msg.get("queueId"));
-        String mailSource = (String) msg.get("mailSource");
-        String severity = (String) msg.get("severity");
-        String sqlId = (String) msg.get("sqlId");
-        String sectionTitle = (String) msg.get("sectionTitle");
-        String sectionContent = MailUtils.convertToString(msg.get("sectionContent"));
-        Integer retryCount = getInteger(msg.get("retryCount"));
+        Long queueId = getLong(msg.get("QUEUE_ID"));
+        String mailSource = (String) msg.get("MAIL_SOURCE");
+        String severity = (String) msg.get("SEVERITY");
+        String sqlId = (String) msg.get("SQL_ID");
+        String sectionTitle = (String) msg.get("SECTION_TITLE");
+        String sectionContent = MailUtils.convertToString(msg.get("SECTION_CONTENT"));
+        String columnOrder = (String) msg.get("COLUMN_ORDER");
+        Integer retryCount = getInteger(msg.get("RETRY_COUNT"));
 
         // 수신인 정보 읽기
-        String recipientUserIds = MailUtils.convertToString(msg.get("recipientUserIds"));
-        String recipientGroups = (String) msg.get("recipientGroups");
+        String recipientUserIds = MailUtils.convertToString(msg.get("RECIPIENT_USER_IDS"));
+        String recipientGroups = (String) msg.get("RECIPIENT_GROUPS");
 
         try {
             // 1. SQL_ID로 테이블 데이터 조회
@@ -107,7 +109,7 @@ public class AlarmMailService {
             List<Recipient> recipients = resolveRecipients(recipientUserIds, recipientGroups);
 
             // 3. MailRequest 생성 (Pure Function 사용)
-            MailRequest request = buildAlarmMailRequest(msg, tableData, recipients);
+            MailRequest request = buildAlarmMailRequest(msg, tableData, recipients, columnOrder);
 
             // 4. MailService 호출 (boolean 반환)
             boolean success = mailService.sendMail(request);
@@ -115,7 +117,7 @@ public class AlarmMailService {
             // 5. 성공/실패 처리
             if (success) {
                 Map<String, Object> updateParams = new HashMap<>();
-                updateParams.put("queueId", queueId);
+                updateParams.put("QUEUE_ID", queueId);
                 mailDao.update("alarm.updateQueueSuccess", updateParams);
                 System.out.println("✅ 알람 발송 성공: " + mailSource + " (수신인 " + recipients.size() + "명)");
             } else {
@@ -138,8 +140,8 @@ public class AlarmMailService {
         }
 
         Map<String, Object> params = new HashMap<>();
-        params.put("queueId", queueId);
-        params.put("errorMessage", errorMessage);
+        params.put("QUEUE_ID", queueId);
+        params.put("ERROR_MESSAGE", errorMessage);
 
         if (retryCount >= MAX_RETRY_COUNT - 1) {
             // 최종 실패
@@ -161,21 +163,24 @@ public class AlarmMailService {
      * DAO 호출 없이 비즈니스 로직만 처리합니다.
      * processMessage()의 핵심 로직을 분리하여 단위 테스트 가능하게 만듭니다.
      *
-     * @param queueData 큐에서 읽은 데이터 (severity, sectionTitle, sectionContent, mailSource 포함)
+     * @param queueData 큐에서 읽은 데이터 (SEVERITY, SECTION_TITLE, SECTION_CONTENT, MAIL_SOURCE 포함)
      * @param tableData SQL_ID 실행 결과 (NULL 가능)
      * @param recipients 조회된 수신인 목록
+     * @param columnOrder 테이블 컬럼 순서 (쉼표 구분, NULL 가능)
      * @return MailRequest 객체
      * @since v2.4.0 (Pure Function 분리)
+     * @since v2.5.0 (columnOrder 파라미터 추가)
      */
     public MailRequest buildAlarmMailRequest(
             Map<String, Object> queueData,
             List<Map<String, Object>> tableData,
-            List<Recipient> recipients
+            List<Recipient> recipients,
+            String columnOrder
     ) {
-        String severity = (String) queueData.get("severity");
-        String sectionTitle = (String) queueData.get("sectionTitle");
-        String sectionContent = MailUtils.convertToString(queueData.get("sectionContent"));
-        String mailSource = (String) queueData.get("mailSource");
+        String severity = (String) queueData.get("SEVERITY");
+        String sectionTitle = (String) queueData.get("SECTION_TITLE");
+        String sectionContent = MailUtils.convertToString(queueData.get("SECTION_CONTENT"));
+        String mailSource = (String) queueData.get("MAIL_SOURCE");
 
         // 테이블 데이터를 String으로 변환
         List<Map<String, String>> tableDataString = convertToStringMap(tableData);
@@ -193,7 +198,14 @@ public class AlarmMailService {
 
         // 테이블 데이터가 있으면 추가
         if (tableDataString != null && !tableDataString.isEmpty()) {
-            builder.addTableSection(tableDataString);
+            // columnOrder가 있으면 메타데이터로 전달
+            if (columnOrder != null && !columnOrder.trim().isEmpty()) {
+                Map<String, Object> metadata = new HashMap<>();
+                metadata.put("columnOrder", columnOrder.trim());
+                builder.addTableSection(null, tableDataString, metadata);
+            } else {
+                builder.addTableSection(tableDataString);
+            }
         }
 
         return builder.build();
@@ -355,10 +367,10 @@ public class AlarmMailService {
         // 3. MyBatis 파라미터 생성
         Map<String, Object> params = new HashMap<>();
         if (!userIdList.isEmpty()) {
-            params.put("userIds", userIdList);
+            params.put("USER_IDS", userIdList);
         }
         if (!groupList.isEmpty()) {
-            params.put("groups", groupList);
+            params.put("GROUPS", groupList);
         }
 
         // 4. 통합 쿼리 호출 (DISTINCT + IN 절)
