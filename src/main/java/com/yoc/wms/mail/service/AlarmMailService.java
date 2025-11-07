@@ -3,7 +3,6 @@ package com.yoc.wms.mail.service;
 import com.yoc.wms.mail.dao.MailDao;
 import com.yoc.wms.mail.domain.MailRequest;
 import com.yoc.wms.mail.domain.Recipient;
-import com.yoc.wms.mail.exception.ValueChainException;
 import com.yoc.wms.mail.util.MailUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -29,6 +28,9 @@ public class AlarmMailService {
 
     @Autowired
     private MailService mailService;
+
+    @Autowired
+    private RecipientResolver recipientResolver;
 
     private static final int MAX_RETRY_COUNT = 3;
 
@@ -86,6 +88,9 @@ public class AlarmMailService {
      *  - RECIPIENT_USER_IDS: RECIPIENT_USER_IDS (콤마 구분 사용자 ID, NULL 가능)
      *  - RECIPIENT_GROUPS: RECIPIENT_GROUPS (콤마 구분 그룹, NULL 가능)
      *  - COLUMN_ORDER: COLUMN_ORDER (콤마 구분 컬럼 순서, NULL 가능)
+     *  - EXCEL_SQL_ID: EXCEL_SQL_ID (Excel 데이터 조회 SQL ID, NULL 가능, v3.0.0)
+     *  - EXCEL_COLUMN_ORDER: EXCEL_COLUMN_ORDER (Excel 컬럼 순서, NULL 가능, v3.0.0)
+     *  - EXCEL_FILE_NAME: EXCEL_FILE_NAME (Excel 파일명, NULL 가능, v3.0.0)
      */
     private void processMessage(Map<String, Object> msg) {
         Long queueId = getLong(msg.get("QUEUE_ID"));
@@ -97,24 +102,52 @@ public class AlarmMailService {
         String columnOrder = (String) msg.get("COLUMN_ORDER");
         Integer retryCount = getInteger(msg.get("RETRY_COUNT"));
 
+        // Excel 관련 정보 읽기 (v3.0.0)
+        String excelSqlId = (String) msg.get("EXCEL_SQL_ID");
+        String excelColumnOrder = (String) msg.get("EXCEL_COLUMN_ORDER");
+        String excelFileName = (String) msg.get("EXCEL_FILE_NAME");
+
         // 수신인 정보 읽기
         String recipientUserIds = MailUtils.convertToString(msg.get("RECIPIENT_USER_IDS"));
         String recipientGroups = (String) msg.get("RECIPIENT_GROUPS");
 
         try {
-            // 1. SQL_ID로 테이블 데이터 조회
+            // 1. SQL_ID로 HTML 테이블 데이터 조회
             List<Map<String, Object>> tableData = mailDao.selectList(sqlId, null);
 
-            // 2. 수신인 목록 동적 조회
-            List<Recipient> recipients = resolveRecipients(recipientUserIds, recipientGroups);
+            // 2. Excel 데이터 조회 (SKIP on error, v3.0.0)
+            List<Map<String, Object>> excelData = null;
+            if (excelSqlId != null && !excelSqlId.trim().isEmpty()) {
+                try {
+                    excelData = mailDao.selectList(excelSqlId, null);
+                    if (excelData == null || excelData.isEmpty()) {
+                        System.out.println("⚠️ Excel 데이터 없음, 첨부 건너뜀: " + excelSqlId);
+                        excelData = null; // Skip
+                    }
+                } catch (Exception e) {
+                    System.err.println("⚠️ Excel 조회 실패, 첨부 건너뜀: " + e.getMessage());
+                    excelData = null; // Skip
+                }
+            }
 
-            // 3. MailRequest 생성 (Pure Function 사용)
-            MailRequest request = buildAlarmMailRequest(msg, tableData, recipients, columnOrder);
+            // 3. 수신인 목록 동적 조회 (RecipientResolver 사용)
+            List<Recipient> recipients = recipientResolver.resolveByConditions(recipientUserIds, recipientGroups, true);
 
-            // 4. MailService 호출 (boolean 반환)
+            // 4. MailRequest 생성 (Pure Function 사용, Excel 포함)
+            MailRequest request = buildAlarmMailRequest(
+                    msg,
+                    tableData,
+                    recipients,
+                    columnOrder,
+                    excelData,
+                    excelColumnOrder,
+                    excelFileName
+            );
+
+            // 5. MailService 호출 (boolean 반환)
             boolean success = mailService.sendMail(request);
 
-            // 5. 성공/실패 처리
+            // 6. 성공/실패 처리
             if (success) {
                 Map<String, Object> updateParams = new HashMap<>();
                 updateParams.put("QUEUE_ID", queueId);
@@ -167,23 +200,30 @@ public class AlarmMailService {
      * @param tableData SQL_ID 실행 결과 (NULL 가능)
      * @param recipients 조회된 수신인 목록
      * @param columnOrder 테이블 컬럼 순서 (쉼표 구분, NULL 가능)
+     * @param excelData Excel 데이터 (NULL이면 첨부 없음, v3.0.0)
+     * @param excelColumnOrder Excel 컬럼 순서 (쉼표 구분, NULL 가능, v3.0.0)
+     * @param excelFileName Excel 파일명 (NULL이면 sectionTitle 기반, v3.0.0)
      * @return MailRequest 객체
      * @since v2.4.0 (Pure Function 분리)
      * @since v2.5.0 (columnOrder 파라미터 추가)
+     * @since v3.0.0 (Excel 파라미터 추가)
      */
     public MailRequest buildAlarmMailRequest(
             Map<String, Object> queueData,
             List<Map<String, Object>> tableData,
             List<Recipient> recipients,
-            String columnOrder
+            String columnOrder,
+            List<Map<String, Object>> excelData,
+            String excelColumnOrder,
+            String excelFileName
     ) {
         String severity = (String) queueData.get("SEVERITY");
         String sectionTitle = (String) queueData.get("SECTION_TITLE");
         String sectionContent = MailUtils.convertToString(queueData.get("SECTION_CONTENT"));
         String mailSource = (String) queueData.get("MAIL_SOURCE");
 
-        // 테이블 데이터를 String으로 변환
-        List<Map<String, String>> tableDataString = convertToStringMap(tableData);
+        // 테이블 데이터를 String으로 변환 (MailUtils 사용)
+        List<Map<String, String>> tableDataString = MailUtils.convertToStringMap(tableData);
 
         // 건수 계산
         int count = (tableDataString != null && !tableDataString.isEmpty()) ? tableDataString.size() : 0;
@@ -208,190 +248,38 @@ public class AlarmMailService {
             }
         }
 
+        // Excel 첨부 추가 (v3.0.0)
+        if (excelData != null && !excelData.isEmpty()) {
+            List<Map<String, String>> excelDataString = MailUtils.convertToStringMap(excelData);
+
+            // 파일명 결정 (NULL이면 sectionTitle 기반)
+            String title = (excelFileName != null && !excelFileName.trim().isEmpty())
+                    ? excelFileName.trim()
+                    : sectionTitle;
+
+            builder.addExcelAttachment(title, excelDataString, excelColumnOrder);
+        }
+
         return builder.build();
     }
 
     /**
-     * 수신인 USER_ID 파싱 (Pure Function)
+     * 큐 데이터로부터 MailRequest 생성 (Pure Function - Excel 없음)
      *
-     * 콤마로 구분된 사용자 ID 문자열을 List로 변환합니다.
-     * trim + 빈 문자열 제거 처리를 수행합니다.
+     * 하위 호환성을 위해 Excel 파라미터가 없는 오버로드 메서드를 유지합니다.
      *
-     * Example:
-     *   Input:  " admin1 , user1 , "
-     *   Output: ["admin1", "user1"]
-     *
-     * @param recipientUserIds 콤마 구분 문자열 (NULL 가능)
-     * @return trim된 사용자 ID 리스트 (대소문자 정규화는 하지 않음)
-     * @since v2.4.0 (Pure Function 분리)
+     * @deprecated v3.0.0 이후 Excel 파라미터가 있는 메서드 사용 권장
      */
-    public List<String> parseRecipientIds(String recipientUserIds) {
-        List<String> result = new ArrayList<>();
-        if (recipientUserIds == null || recipientUserIds.trim().isEmpty()) {
-            return result;
-        }
-
-        String[] tokens = recipientUserIds.split(",");
-        for (String token : tokens) {
-            String trimmed = token.trim();
-            if (!trimmed.isEmpty()) {
-                result.add(trimmed);
-            }
-        }
-        return result;
-    }
-
-    /**
-     * 수신인 그룹 파싱 (Pure Function)
-     *
-     * 콤마로 구분된 그룹 문자열을 List로 변환합니다.
-     * trim + 빈 문자열 제거 처리를 수행합니다.
-     *
-     * Example:
-     *   Input:  " ADM , SALES , "
-     *   Output: ["ADM", "SALES"]
-     *
-     * @param recipientGroups 콤마 구분 문자열 (NULL 가능)
-     * @return trim된 그룹 리스트 (대소문자 정규화는 하지 않음)
-     * @since v2.4.0 (Pure Function 분리)
-     */
-    public List<String> parseRecipientGroups(String recipientGroups) {
-        List<String> result = new ArrayList<>();
-        if (recipientGroups == null || recipientGroups.trim().isEmpty()) {
-            return result;
-        }
-
-        String[] tokens = recipientGroups.split(",");
-        for (String token : tokens) {
-            String trimmed = token.trim();
-            if (!trimmed.isEmpty()) {
-                result.add(trimmed);
-            }
-        }
-        return result;
-    }
-
-    /**
-     * Map 타입 변환 (Object → String, 테이블 렌더링용) - Pure Function
-     *
-     * MyBatis 조회 결과를 MailRequest.addTableSection()에 전달 가능한 형식으로 변환합니다.
-     *
-     * Why LinkedHashMap:
-     * - MailBodyRenderer가 map.keySet()을 순회하며 테이블 헤더 생성
-     * - HashMap은 순서 미보장 → 컬럼 순서가 매번 변경될 수 있음
-     * - LinkedHashMap은 삽입 순서 유지 → DB 쿼리 결과 순서 그대로 반영
-     *
-     * Example:
-     *   Input:  [{orderId=1, customerName="홍길동", status=10}]  (Integer status)
-     *   Output: [{orderId="1", customerName="홍길동", status="10"}]  (All String)
-     *
-     * Spring 3.2 ASM 호환 (v2.1.3):
-     * - Before: maps.stream().map(m -> {...}).collect(Collectors.toList())
-     * - After: 중첩 for-loop (Lambda 제거)
-     *
-     * @param source MyBatis 조회 결과 (List<Map<String, Object>>, NULL 가능)
-     * @return String으로 변환된 Map 리스트 (LinkedHashMap으로 순서 보장)
-     * @since v2.1.3 (Spring 3.2 호환 for-loop 전환)
-     * @since v2.4.0 (public으로 변경, Pure Function)
-     */
-    public List<Map<String, String>> convertToStringMap(List<Map<String, Object>> source) {
-        List<Map<String, String>> result = new ArrayList<>();
-        if (source == null) {
-            return result;
-        }
-        for (Map<String, Object> map : source) {
-            Map<String, String> stringMap = new LinkedHashMap<>();  // 순서 보장
-            for (Map.Entry<String, Object> entry : map.entrySet()) {
-                stringMap.put(entry.getKey(), entry.getValue() != null ? entry.getValue().toString() : "");
-            }
-            result.add(stringMap);
-        }
-        return result;
+    public MailRequest buildAlarmMailRequest(
+            Map<String, Object> queueData,
+            List<Map<String, Object>> tableData,
+            List<Recipient> recipients,
+            String columnOrder
+    ) {
+        return buildAlarmMailRequest(queueData, tableData, recipients, columnOrder, null, null, null);
     }
 
     // ===== Orchestration (통합 테스트 대상) =====
-
-    /**
-     * 동적 수신인 조회 (사용자 ID + 그룹 통합)
-     *
-     * RECIPIENT_USER_IDS와 RECIPIENT_GROUPS를 동적으로 조회하여 실제 Recipient 목록을 생성합니다.
-     *
-     * Features (v2.1.0+):
-     * - 유연한 조합: 사용자 ID / 그룹 / 조합 모두 가능
-     * - NULL 기본값: 둘 다 NULL이면 ADM 그룹 자동 발송
-     * - 대소문자 정규화: Recipient.fromMap()에서 일원화 (v2.1.1)
-     * - 중복 제거: 이메일 기준 (fromMapList 내부 처리)
-     *
-     * Logic Flow:
-     * 1. NULL 체크 → 둘 다 NULL이면 ADM 그룹 기본 설정
-     * 2. 콤마 split → trim (parseRecipientIds/Groups 사용)
-     * 3. MyBatis 통합 쿼리 호출 (alarm.selectRecipientsByConditions)
-     * 4. Recipient.fromMapList()로 변환 + 중복 제거
-     * 5. 빈 결과 → ValueChainException 발생
-     *
-     * Spring 3.2 ASM 호환 (v2.1.3):
-     * - Arrays.stream().map().filter().collect() 제거
-     * - for-loop + 수동 필터링으로 전환
-     *
-     * Example QUEUE Data:
-     *   RECIPIENT_USER_IDS: "ADMIN1,sales001" (대소문자 혼용)
-     *   RECIPIENT_GROUPS: "ADM,LOGISTICS"
-     *   → DB 조회: ["admin@test.com", "sales@test.com", "logistics@test.com"]
-     *   → Recipient: USER_ID 대문자, EMAIL 소문자, 중복 제거
-     *
-     * @param recipientUserIds 콤마 구분 사용자 ID (NULL 가능, 대소문자 혼용 가능)
-     * @param recipientGroups 콤마 구분 그룹명 (NULL 가능, 대소문자 혼용 가능)
-     * @return 중복 제거된 Recipient 목록 (이메일 기준)
-     * @throws ValueChainException 수신인 조회 결과가 없는 경우
-     * @since v2.1.0 (동적 수신인 조회 도입)
-     * @since v2.1.1 (대소문자 정규화 Recipient 일원화)
-     * @since v2.1.3 (Spring 3.2 호환 for-loop 전환)
-     * @since v2.4.0 (parseRecipientIds/Groups Pure Function 사용)
-     */
-    private List<Recipient> resolveRecipients(String recipientUserIds, String recipientGroups) {
-        // 1. NULL 체크 및 기본값 설정 (알람 메일 전용)
-        boolean hasUserIds = recipientUserIds != null && !recipientUserIds.trim().isEmpty();
-        boolean hasGroups = recipientGroups != null && !recipientGroups.trim().isEmpty();
-
-        if (!hasUserIds && !hasGroups) {
-            // 둘 다 NULL이면 ADM 그룹을 기본값으로 설정
-            System.out.println("⚠️ 수신인 미지정 → ADM 그룹 기본 발송");
-            recipientGroups = "ADM";
-            hasGroups = true;
-        }
-
-        // 2. 콤마 구분 문자열을 List로 변환 (Pure Function 사용)
-        List<String> userIdList = hasUserIds ? parseRecipientIds(recipientUserIds) : new ArrayList<String>();
-        List<String> groupList = hasGroups ? parseRecipientGroups(recipientGroups) : new ArrayList<String>();
-
-        // 3. MyBatis 파라미터 생성
-        Map<String, Object> params = new HashMap<>();
-        if (!userIdList.isEmpty()) {
-            params.put("USER_IDS", userIdList);
-        }
-        if (!groupList.isEmpty()) {
-            params.put("GROUPS", groupList);
-        }
-
-        // 4. 통합 쿼리 호출 (DISTINCT + IN 절)
-        List<Map<String, Object>> recipientMaps = mailDao.selectList("alarm.selectRecipientsByConditions", params);
-
-        // 5. Recipient 변환 및 이메일 기준 중복 제거 (fromMapList 사용)
-        List<Recipient> recipients = Recipient.fromMapList(recipientMaps);
-
-        // 6. 유효성 검증
-        if (recipients.isEmpty()) {
-            throw new ValueChainException(
-                    "수신인 조회 결과가 없습니다. " +
-                            "userIds=" + userIdList + ", groups=" + groupList
-            );
-        }
-
-        System.out.println("📧 수신인 조회 완료: " + recipients.size() + "명 " +
-                "(userIds=" + userIdList.size() + ", groups=" + groupList.size() + ")");
-
-        return recipients;
-    }
 
     private Long getLong(Object value) {
         if (value instanceof Number) {

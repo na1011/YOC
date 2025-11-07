@@ -3,9 +3,7 @@ package com.yoc.wms.mail.util;
 import com.yoc.wms.mail.domain.Recipient;
 import com.yoc.wms.mail.exception.ValueChainException;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.regex.Pattern;
 
 /**
@@ -140,5 +138,91 @@ public class MailUtils {
             sb.append(recipients.get(i).getEmail());
         }
         return sb.toString();
+    }
+
+    /**
+     * 콤마 구분 문자열 파싱 (Pure Function)
+     *
+     * 콤마로 구분된 문자열을 trim 처리하여 List로 변환합니다.
+     * 빈 문자열은 제외됩니다.
+     *
+     * Example:
+     *   Input:  " admin1 , user1 , "
+     *   Output: ["admin1", "user1"]
+     *
+     * Spring 3.1.2 호환: for-loop 사용 (Lambda/Stream 금지)
+     *
+     * @param commaSeparated 콤마 구분 문자열 (NULL 가능)
+     * @return trim된 문자열 리스트 (빈 문자열 제외)
+     * @since v2.6.0 (리팩토링)
+     */
+    public static List<String> parseCommaSeparated(String commaSeparated) {
+        List<String> result = new ArrayList<>();
+        if (commaSeparated == null || commaSeparated.trim().isEmpty()) {
+            return result;
+        }
+
+        String[] tokens = commaSeparated.split(",");
+        for (String token : tokens) {
+            String trimmed = token.trim();
+            if (!trimmed.isEmpty()) {
+                result.add(trimmed);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Map 타입 변환 (Object → String, 테이블 렌더링용) - Pure Function
+     *
+     * MyBatis 조회 결과를 MailRequest.addTableSection()에 전달 가능한 형식으로 변환합니다.
+     *
+     * Null Handling:
+     * - 입력 리스트가 null → 빈 리스트 반환
+     * - 리스트 내 null 요소 → 자동 필터링 (스킵)
+     * - Map 내 null 값 → 빈 문자열로 변환
+     *
+     * Why Auto-Filter Nulls:
+     * - 일관성: parseCommaSeparated(), convertToString()도 null-safe
+     * - Railway Oriented: 예상된 데이터 이상 → Fail-Safe 처리
+     * - DRY: Service별 검증 코드 불필요
+     * - Static Utility Pattern: 방어적, 재사용 가능
+     *
+     * Why LinkedHashMap:
+     * - MailBodyRenderer가 map.keySet()을 순회하며 테이블 헤더 생성
+     * - HashMap은 순서 미보장 → 컬럼 순서가 매번 변경될 수 있음
+     * - LinkedHashMap은 삽입 순서 유지 → DB 쿼리 결과 순서 그대로 반영
+     *
+     * Example:
+     *   Input:  [{orderId=1, customerName="홍길동", status=10}, null, {orderId=2, ...}]
+     *   Output: [{orderId="1", customerName="홍길동", status="10"}, {orderId="2", ...}]
+     *           (null 요소는 자동 필터링됨)
+     *
+     * Spring 3.1.2 ASM 호환:
+     * - Before: maps.stream().map(m -> {...}).collect(Collectors.toList())
+     * - After: 중첩 for-loop (Lambda 제거)
+     *
+     * @param source MyBatis 조회 결과 (List<Map<String, Object>>, NULL 가능)
+     * @return String으로 변환된 Map 리스트 (LinkedHashMap으로 순서 보장, null 요소 제외)
+     * @since v2.1.3 (AlarmMailService에서 이동)
+     * @since v2.6.0 (MailUtils로 공통화)
+     * @since v2.6.1 (null 요소 자동 필터링 추가)
+     */
+    public static List<Map<String, String>> convertToStringMap(List<Map<String, Object>> source) {
+        List<Map<String, String>> result = new ArrayList<>();
+        if (source == null) {
+            return result;
+        }
+        for (Map<String, Object> map : source) {
+            if (map == null) {
+                continue;  // Skip null elements (fail-safe)
+            }
+            Map<String, String> stringMap = new LinkedHashMap<>();  // 순서 보장
+            for (Map.Entry<String, Object> entry : map.entrySet()) {
+                stringMap.put(entry.getKey(), entry.getValue() != null ? entry.getValue().toString() : "");
+            }
+            result.add(stringMap);
+        }
+        return result;
     }
 }

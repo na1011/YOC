@@ -5,10 +5,12 @@ import com.yoc.wms.mail.dao.MailDao;
 import com.yoc.wms.mail.domain.MailRequest;
 import com.yoc.wms.mail.domain.Recipient;
 import com.yoc.wms.mail.domain.MailSection;
+import com.yoc.wms.mail.domain.ExcelAttachment;
 import com.yoc.wms.mail.enums.SendStatus;
 import com.yoc.wms.mail.exception.ValueChainException;
 import com.yoc.wms.mail.renderer.MailBodyRenderer;
 import com.yoc.wms.mail.util.MailUtils;
+import com.yoc.wms.mail.util.ExcelUtils;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -17,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import jakarta.mail.internet.MimeMessage;
+import jakarta.mail.util.ByteArrayDataSource;
 
 import java.net.InetAddress;
 import java.util.*;
@@ -114,12 +117,13 @@ public class MailService {
                     htmlBody
             );
 
-            // 5. 메일 발송 (재시도 포함)
+            // 5. 메일 발송 (재시도 포함, v3.0.0: Excel 첨부 추가)
             boolean success = sendWithRetry(
                     request.getRecipients(),
                     request.getCcRecipients(),
                     request.getSubject(),
                     htmlBody,
+                    request.getExcelAttachments(),
                     logId
             );
 
@@ -252,16 +256,17 @@ public class MailService {
     /**
      * 재시도 포함 발송
      *
+     * @param excelAttachments Excel 첨부파일 목록 (NULL 가능, v3.0.0)
      * @return 성공 시 true, 실패 시 false
      */
     private boolean sendWithRetry(List<Recipient> recipients, List<Recipient> ccRecipients,
-                                  String subject, String htmlBody, Long logId) {
+                                  String subject, String htmlBody, List<ExcelAttachment> excelAttachments, Long logId) {
         int attempt = 0;
         Exception lastException = null;
 
         while (attempt < MAX_RETRY_COUNT) {
             try {
-                doSendMail(recipients, ccRecipients, subject, htmlBody);
+                doSendMail(recipients, ccRecipients, subject, htmlBody, excelAttachments);
 
                 // 성공
                 updateLogStatus(logId, SendStatus.SUCCESS, null);
@@ -292,10 +297,14 @@ public class MailService {
 
     /**
      * 실제 메일 발송 (일괄)
-     * Spring 3.2 ASM 호환성을 위해 for-loop 사용 (lambda/method reference 제거)
+     *
+     * Spring 3.1.2 ASM 호환성을 위해 for-loop 사용 (lambda/method reference 제거)
+     *
+     * @param excelAttachments Excel 첨부파일 목록 (NULL 가능, v3.0.0)
+     * @since v3.0.0 (Excel 첨부 지원)
      */
     private void doSendMail(List<Recipient> recipients, List<Recipient> ccRecipients,
-                            String subject, String htmlBody) throws Exception {
+                            String subject, String htmlBody, List<ExcelAttachment> excelAttachments) throws Exception {
         MimeMessage message = mailSender.createMimeMessage();
         MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
@@ -311,6 +320,48 @@ public class MailService {
 
         helper.setSubject(subject);
         helper.setText(htmlBody, true);
+
+        // Excel 첨부파일 처리 (v3.0.0, Railway Oriented: Skip on error)
+        if (excelAttachments != null && !excelAttachments.isEmpty()) {
+            // 파일명 중복 방지용 Set
+            Set<String> usedFileNames = new HashSet<>();
+
+            for (int i = 0; i < excelAttachments.size(); i++) {
+                ExcelAttachment attachment = excelAttachments.get(i);
+                try {
+                    // Excel 바이트 생성 (Pure Function)
+                    byte[] excelBytes = ExcelUtils.createExcelBytes(
+                            attachment.getData(),
+                            attachment.getColumnOrder()
+                    );
+
+                    // 파일명 생성 (Pure Function)
+                    String fileName = ExcelUtils.generateFileName(attachment.getTitle());
+
+                    // 파일명 중복 시 번호 추가
+                    if (usedFileNames.contains(fileName)) {
+                        int suffix = 1;
+                        String baseName = fileName.replace(".xlsx", "");
+                        while (usedFileNames.contains(baseName + "_" + suffix + ".xlsx")) {
+                            suffix++;
+                        }
+                        fileName = baseName + "_" + suffix + ".xlsx";
+                    }
+                    usedFileNames.add(fileName);
+
+                    // 첨부파일 추가
+                    ByteArrayDataSource dataSource = new ByteArrayDataSource(excelBytes,
+                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+                    helper.addAttachment(fileName, dataSource);
+
+                    System.out.println("✅ Excel 첨부 성공: " + fileName);
+
+                } catch (Exception e) {
+                    // Excel 생성 실패 시 Skip (메일은 발송)
+                    System.err.println("⚠️ Excel 첨부 실패, 건너뜀: " + attachment.getTitle() + " - " + e.getMessage());
+                }
+            }
+        }
 
         mailSender.send(message);
     }

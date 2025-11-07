@@ -57,6 +57,9 @@ CREATE TABLE MAIL_QUEUE (
                             RECIPIENT_USER_IDS  VARCHAR2(1000),
                             RECIPIENT_GROUPS    VARCHAR2(1000),
                             COLUMN_ORDER        VARCHAR2(500),
+                            EXCEL_SQL_ID        VARCHAR2(200),
+                            EXCEL_COLUMN_ORDER  VARCHAR2(500),
+                            EXCEL_FILE_NAME     VARCHAR2(200),
                             STATUS              VARCHAR2(20)    NOT NULL CHECK (STATUS IN ('PENDING', 'SUCCESS', 'FAILED')),
                             RETRY_COUNT         NUMBER          DEFAULT 0,
                             ERROR_MESSAGE       VARCHAR2(2000),
@@ -76,6 +79,9 @@ COMMENT ON COLUMN MAIL_QUEUE.SECTION_CONTENT IS '메일 본문 섹션 내용 (TE
 COMMENT ON COLUMN MAIL_QUEUE.RECIPIENT_USER_IDS IS '수신 사용자 ID (콤마 구분, NULL 가능, 예: USER001,USER002)';
 COMMENT ON COLUMN MAIL_QUEUE.RECIPIENT_GROUPS IS '수신 그룹 (콤마 구분, NULL 가능, 둘 다 NULL이면 ADM 기본, 예: ADM,SALES)';
 COMMENT ON COLUMN MAIL_QUEUE.COLUMN_ORDER IS '테이블 컬럼 순서 (콤마 구분, NULL 가능, 예: orderId,customer,orderDate)';
+COMMENT ON COLUMN MAIL_QUEUE.EXCEL_SQL_ID IS 'Excel 데이터 조회 MyBatis SQL ID (NULL 가능, 예: alarm.selectOverdueOrdersDetail)';
+COMMENT ON COLUMN MAIL_QUEUE.EXCEL_COLUMN_ORDER IS 'Excel 컬럼 순서 (콤마 구분, NULL 가능, 예: orderId,customer,orderDate)';
+COMMENT ON COLUMN MAIL_QUEUE.EXCEL_FILE_NAME IS 'Excel 파일명 (NULL이면 SECTION_TITLE 기반, 예: 지연주문현황)';
 
 
 -- ==================== 4. 사용자 정보 (테스트용) ====================

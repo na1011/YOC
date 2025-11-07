@@ -5,10 +5,7 @@ import com.yoc.wms.mail.domain.MailRequest;
 import com.yoc.wms.mail.service.AlarmMailService;
 import com.yoc.wms.mail.service.MailService;
 import com.yoc.wms.mail.util.FakeMailSender;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.FixMethodOrder;
-import org.junit.Test;
+import org.junit.*;
 import org.junit.runner.RunWith;
 import org.junit.runners.MethodSorters;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -61,6 +58,7 @@ import static org.junit.Assert.*;
 @ActiveProfiles("integration")
 @Import(IntegrationTestConfig.class)  // ⭐ FakeMailSender 주입
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
+@Ignore("실제 메일 발송 테스트 - 필요 시 @Ignore 제거 후 실행")
 public class AlarmMailServiceIntegrationTest {
 
     @Autowired

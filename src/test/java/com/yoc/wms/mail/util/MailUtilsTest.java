@@ -5,9 +5,7 @@ import com.yoc.wms.mail.exception.ValueChainException;
 import org.junit.Test;
 
 import java.sql.Clob;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
@@ -406,6 +404,202 @@ public class MailUtilsTest {
         assertEquals(4, countOccurrences(result, ",")); // 5개 이메일 = 4개 콤마
     }
 
+    // ==================== parseCommaSeparated() 테스트 ====================
+
+    @Test
+    public void parseCommaSeparated_valid() {
+        // When
+        List<String> result = MailUtils.parseCommaSeparated("admin1,user1,user2");
+
+        // Then
+        assertEquals(3, result.size());
+        assertEquals("admin1", result.get(0));
+        assertEquals("user1", result.get(1));
+        assertEquals("user2", result.get(2));
+    }
+
+    @Test
+    public void parseCommaSeparated_withSpaces() {
+        // When
+        List<String> result = MailUtils.parseCommaSeparated(" admin1 , user1 , user2 ");
+
+        // Then
+        assertEquals(3, result.size());
+        assertEquals("admin1", result.get(0));
+        assertEquals("user1", result.get(1));
+        assertEquals("user2", result.get(2));
+    }
+
+    @Test
+    public void parseCommaSeparated_emptyTokens() {
+        // When
+        List<String> result = MailUtils.parseCommaSeparated("admin1,,user1,");
+
+        // Then
+        assertEquals(2, result.size());
+        assertEquals("admin1", result.get(0));
+        assertEquals("user1", result.get(1));
+    }
+
+    @Test
+    public void parseCommaSeparated_null() {
+        // When
+        List<String> result = MailUtils.parseCommaSeparated(null);
+
+        // Then
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    public void parseCommaSeparated_empty() {
+        // When
+        List<String> result = MailUtils.parseCommaSeparated("");
+
+        // Then
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    public void parseCommaSeparated_onlySpaces() {
+        // When
+        List<String> result = MailUtils.parseCommaSeparated("   ");
+
+        // Then
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    public void parseCommaSeparated_single() {
+        // When
+        List<String> result = MailUtils.parseCommaSeparated("admin");
+
+        // Then
+        assertEquals(1, result.size());
+        assertEquals("admin", result.get(0));
+    }
+
+    // ==================== convertToStringMap() 테스트 ====================
+
+    @Test
+    public void convertToStringMap_mixedTypes() {
+        // Given
+        List<Map<String, Object>> source = Arrays.asList(
+            createMap("KEY1", "Value1", "KEY2", 123, "KEY3", 45.67)
+        );
+
+        // When
+        List<Map<String, String>> result = MailUtils.convertToStringMap(source);
+
+        // Then
+        assertEquals(1, result.size());
+        assertEquals("Value1", result.get(0).get("KEY1"));
+        assertEquals("123", result.get(0).get("KEY2"));
+        assertEquals("45.67", result.get(0).get("KEY3"));
+    }
+
+    @Test
+    public void convertToStringMap_nullValue() {
+        // Given
+        List<Map<String, Object>> source = Arrays.asList(
+            createMap("KEY1", "Value1", "KEY2", null)
+        );
+
+        // When
+        List<Map<String, String>> result = MailUtils.convertToStringMap(source);
+
+        // Then
+        assertEquals("", result.get(0).get("KEY2"));
+    }
+
+    @Test
+    public void convertToStringMap_emptyList() {
+        // Given
+        List<Map<String, Object>> source = new ArrayList<>();
+
+        // When
+        List<Map<String, String>> result = MailUtils.convertToStringMap(source);
+
+        // Then
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    public void convertToStringMap_null() {
+        // When
+        List<Map<String, String>> result = MailUtils.convertToStringMap(null);
+
+        // Then
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    public void convertToStringMap_multipleRows() {
+        // Given
+        List<Map<String, Object>> source = Arrays.asList(
+            createMap("KEY", "Row1"),
+            createMap("KEY", "Row2"),
+            createMap("KEY", "Row3")
+        );
+
+        // When
+        List<Map<String, String>> result = MailUtils.convertToStringMap(source);
+
+        // Then
+        assertEquals(3, result.size());
+        assertEquals("Row1", result.get(0).get("KEY"));
+        assertEquals("Row2", result.get(1).get("KEY"));
+        assertEquals("Row3", result.get(2).get("KEY"));
+    }
+
+    @Test
+    public void convertToStringMap_preservesOrder() {
+        // Given
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("FIRST", "1");
+        map.put("SECOND", "2");
+        map.put("THIRD", "3");
+        List<Map<String, Object>> source = Arrays.asList(map);
+
+        // When
+        List<Map<String, String>> result = MailUtils.convertToStringMap(source);
+
+        // Then - LinkedHashMap preserves order
+        Iterator<String> keys = result.get(0).keySet().iterator();
+        assertEquals("FIRST", keys.next());
+        assertEquals("SECOND", keys.next());
+        assertEquals("THIRD", keys.next());
+    }
+
+    @Test
+    public void convertToStringMap_withNullElement() {
+        // Given - MyBatis "SELECT null FROM DUAL" 시나리오
+        List<Map<String, Object>> source = Arrays.asList(
+            createMap("KEY", "Value1"),
+            null,  // null element (자동 필터링 대상)
+            createMap("KEY", "Value2")
+        );
+
+        // When
+        List<Map<String, String>> result = MailUtils.convertToStringMap(source);
+
+        // Then - null element is filtered out
+        assertEquals(2, result.size());
+        assertEquals("Value1", result.get(0).get("KEY"));
+        assertEquals("Value2", result.get(1).get("KEY"));
+    }
+
+    @Test
+    public void convertToStringMap_allNullElements() {
+        // Given - 모든 요소가 null
+        List<Map<String, Object>> source = Arrays.asList(null, null, null);
+
+        // When
+        List<Map<String, String>> result = MailUtils.convertToStringMap(source);
+
+        // Then - returns empty list (빈 리스트 반환)
+        assertTrue(result.isEmpty());
+    }
+
     // ==================== 엣지케이스 테스트 ====================
 
     @Test
@@ -462,5 +656,16 @@ public class MailUtilsTest {
             index += substr.length();
         }
         return count;
+    }
+
+    /**
+     * Map 생성 헬퍼 (가변 인자)
+     */
+    private Map<String, Object> createMap(Object... keyValues) {
+        Map<String, Object> map = new HashMap<>();
+        for (int i = 0; i < keyValues.length; i += 2) {
+            map.put((String) keyValues[i], keyValues[i + 1]);
+        }
+        return map;
     }
 }

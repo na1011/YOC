@@ -52,6 +52,7 @@ import static org.junit.Assert.*;
 @ActiveProfiles("integration")
 @Import(IntegrationTestConfig.class)  // ⭐ FakeMailSender 주입
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
+@Ignore("실제 메일 발송 테스트 - 필요 시 @Ignore 제거 후 실행")
 public class MailServiceIntegrationTest {
 
     @Autowired

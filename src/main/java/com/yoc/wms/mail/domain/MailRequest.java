@@ -21,6 +21,7 @@ public class MailRequest {
     private final List<Recipient> ccRecipients;
     private final String mailType;        // ALARM, DIRECT, REPORT 등
     private final String mailSource;      // 알람타입 또는 발송 소스
+    private final List<ExcelAttachment> excelAttachments;  // Excel 첨부파일 (v3.0.0)
 
     private MailRequest(Builder builder) {
         this.subject = builder.subject;
@@ -29,6 +30,7 @@ public class MailRequest {
         this.ccRecipients = builder.ccRecipients;
         this.mailType = builder.mailType != null ? builder.mailType : "DIRECT";
         this.mailSource = builder.mailSource;
+        this.excelAttachments = builder.excelAttachments;
 
         validate();
     }
@@ -72,6 +74,14 @@ public class MailRequest {
 
     public boolean hasCc() {
         return ccRecipients != null && !ccRecipients.isEmpty();
+    }
+
+    public List<ExcelAttachment> getExcelAttachments() {
+        return excelAttachments;
+    }
+
+    public boolean hasExcelAttachments() {
+        return excelAttachments != null && !excelAttachments.isEmpty();
     }
 
     // ==================== Helper Methods (도메인 로직 캡슐화) ====================
@@ -164,6 +174,7 @@ public class MailRequest {
         private List<Recipient> ccRecipients = new ArrayList<>();
         private String mailType;
         private String mailSource;
+        private List<ExcelAttachment> excelAttachments = new ArrayList<>();
 
         public Builder subject(String subject) {
             this.subject = subject;
@@ -352,6 +363,52 @@ public class MailRequest {
 
         public Builder mailSource(String mailSource) {
             this.mailSource = mailSource;
+            return this;
+        }
+
+        // ==================== Excel 첨부 메서드 (v3.0.0) ====================
+
+        /**
+         * Excel 첨부파일 추가
+         *
+         * @param title 파일명 기반 제목 (이모티콘 자동 제거됨)
+         * @param data Excel 데이터
+         * @param columnOrder 컬럼 순서 (쉼표 구분, NULL 가능)
+         * @return Builder
+         * @since v3.0.0
+         */
+        public Builder addExcelAttachment(String title, List<Map<String, String>> data, String columnOrder) {
+            this.excelAttachments.add(ExcelAttachment.builder()
+                    .title(title)
+                    .data(data)
+                    .columnOrder(columnOrder)
+                    .build());
+            return this;
+        }
+
+        /**
+         * Excel 첨부파일 추가 (컬럼 순서 없음)
+         *
+         * @param title 파일명 기반 제목
+         * @param data Excel 데이터
+         * @return Builder
+         * @since v3.0.0
+         */
+        public Builder addExcelAttachment(String title, List<Map<String, String>> data) {
+            return addExcelAttachment(title, data, null);
+        }
+
+        /**
+         * Excel 첨부파일 추가 (ExcelAttachment 객체)
+         *
+         * @param attachment Excel 첨부파일 객체
+         * @return Builder
+         * @since v3.0.0
+         */
+        public Builder addExcelAttachment(ExcelAttachment attachment) {
+            if (attachment != null) {
+                this.excelAttachments.add(attachment);
+            }
             return this;
         }
 

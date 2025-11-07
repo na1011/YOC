@@ -14,9 +14,10 @@ import static org.junit.Assert.*;
  *
  * 테스트 범위:
  * - buildAlarmMailRequest() - MailRequest 생성 로직
- * - parseRecipientIds() - 사용자 ID 파싱
- * - parseRecipientGroups() - 그룹 파싱
- * - convertToStringMap() - Map 타입 변환
+ *
+ * Note:
+ * - parseRecipientIds/Groups, convertToStringMap은 MailUtils로 이동 (v2.6.0)
+ * - 해당 기능은 MailUtilsTest에서 테스트
  *
  * Mock/verify 없음 (Chicago School 테스트 방식)
  * 운영 환경 100% 호환 (Mockito 불필요)
@@ -417,258 +418,114 @@ public class AlarmMailServiceTest {
         assertEquals("TEXT", result.getSections().get(0).getType().name());
     }
 
-    // ===== parseRecipientIds() 테스트 =====
+    // ===== buildAlarmMailRequest() with Excel 테스트 (v3.0.0) =====
 
     @Test
-    public void parseRecipientIds_multipleIds() {
+    public void buildAlarmMailRequest_withExcelData() {
         // Given
-        String input = "admin1,user1,sales001";
-
-        // When
-        List<String> result = service.parseRecipientIds(input);
-
-        // Then
-        assertEquals(Arrays.asList("admin1", "user1", "sales001"), result);
-    }
-
-    @Test
-    public void parseRecipientIds_singleId() {
-        // Given
-        String input = "admin1";
-
-        // When
-        List<String> result = service.parseRecipientIds(input);
-
-        // Then
-        assertEquals(Arrays.asList("admin1"), result);
-    }
-
-    @Test
-    public void parseRecipientIds_withWhitespace() {
-        // Given
-        String input = " admin1 , user1 , sales001 ";
-
-        // When
-        List<String> result = service.parseRecipientIds(input);
-
-        // Then
-        assertEquals(Arrays.asList("admin1", "user1", "sales001"), result);
-    }
-
-    @Test
-    public void parseRecipientIds_withEmptyItems() {
-        // Given
-        String input = "admin1,,user1,";
-
-        // When
-        List<String> result = service.parseRecipientIds(input);
-
-        // Then
-        assertEquals(Arrays.asList("admin1", "user1"), result);
-    }
-
-    @Test
-    public void parseRecipientIds_nullInput() {
-        // When
-        List<String> result = service.parseRecipientIds(null);
-
-        // Then
-        assertTrue(result.isEmpty());
-    }
-
-    @Test
-    public void parseRecipientIds_emptyInput() {
-        // When
-        List<String> result = service.parseRecipientIds("  ");
-
-        // Then
-        assertTrue(result.isEmpty());
-    }
-
-    @Test
-    public void parseRecipientIds_onlyCommas() {
-        // Given
-        String input = ",,,";
-
-        // When
-        List<String> result = service.parseRecipientIds(input);
-
-        // Then
-        assertTrue(result.isEmpty());
-    }
-
-    @Test
-    public void parseRecipientIds_mixedCase() {
-        // Given - parseRecipientIds()는 대소문자 정규화하지 않음
-        String input = "Admin1,USER1,SaLes001";
-
-        // When
-        List<String> result = service.parseRecipientIds(input);
-
-        // Then
-        assertEquals(Arrays.asList("Admin1", "USER1", "SaLes001"), result);
-        // 대소문자 정규화는 Recipient.fromMap()에서 담당
-    }
-
-    // ===== parseRecipientGroups() 테스트 =====
-
-    @Test
-    public void parseRecipientGroups_multipleGroups() {
-        // Given
-        String input = "ADM,SALES,LOGISTICS";
-
-        // When
-        List<String> result = service.parseRecipientGroups(input);
-
-        // Then
-        assertEquals(Arrays.asList("ADM", "SALES", "LOGISTICS"), result);
-    }
-
-    @Test
-    public void parseRecipientGroups_singleGroup() {
-        // Given
-        String input = "ADM";
-
-        // When
-        List<String> result = service.parseRecipientGroups(input);
-
-        // Then
-        assertEquals(Arrays.asList("ADM"), result);
-    }
-
-    @Test
-    public void parseRecipientGroups_withWhitespace() {
-        // Given
-        String input = " ADM , SALES , LOGISTICS ";
-
-        // When
-        List<String> result = service.parseRecipientGroups(input);
-
-        // Then
-        assertEquals(Arrays.asList("ADM", "SALES", "LOGISTICS"), result);
-    }
-
-    @Test
-    public void parseRecipientGroups_nullInput() {
-        // When
-        List<String> result = service.parseRecipientGroups(null);
-
-        // Then
-        assertTrue(result.isEmpty());
-    }
-
-    @Test
-    public void parseRecipientGroups_emptyInput() {
-        // When
-        List<String> result = service.parseRecipientGroups("  ");
-
-        // Then
-        assertTrue(result.isEmpty());
-    }
-
-    // ===== convertToStringMap() 테스트 =====
-
-    @Test
-    public void convertToStringMap_basicConversion() {
-        // Given
-        List<Map<String, Object>> input = Arrays.asList(
-                createMap("orderId", 1, "name", "홍길동", "active", true),
-                createMap("orderId", 2, "name", "김철수", "active", false)
+        Map<String, Object> queueData = createMap(
+                "SEVERITY", "CRITICAL",
+                "SECTION_TITLE", "재고 부족",
+                "SECTION_CONTENT", "긴급 확인이 필요합니다.",
+                "MAIL_SOURCE", "LOW_STOCK"
+        );
+        List<Map<String, Object>> tableData = Arrays.asList(
+                createMap("productId", "P001", "stock", 5)
+        );
+        List<Map<String, Object>> excelData = Arrays.asList(
+                createMap("productId", "P001", "stock", 5),
+                createMap("productId", "P002", "stock", 3)
+        );
+        List<Recipient> recipients = Arrays.asList(
+                Recipient.builder().email("admin@company.com").build()
         );
 
         // When
-        List<Map<String, String>> result = service.convertToStringMap(input);
+        MailRequest result = service.buildAlarmMailRequest(
+                queueData, tableData, recipients, null,
+                excelData, "productId,stock", "재고부족현황"
+        );
 
         // Then
-        assertEquals(2, result.size());
-        assertEquals("1", result.get(0).get("orderId"));
-        assertEquals("홍길동", result.get(0).get("name"));
-        assertEquals("true", result.get(0).get("active"));
-        assertEquals("2", result.get(1).get("orderId"));
-        assertEquals("김철수", result.get(1).get("name"));
-        assertEquals("false", result.get(1).get("active"));
+        assertTrue(result.hasExcelAttachments());
+        assertEquals(1, result.getExcelAttachments().size());
+        assertEquals("재고부족현황", result.getExcelAttachments().get(0).getTitle());
+        assertEquals(2, result.getExcelAttachments().get(0).getData().size());
+        assertEquals("productId,stock", result.getExcelAttachments().get(0).getColumnOrder());
     }
 
     @Test
-    public void convertToStringMap_withNullValues() {
+    public void buildAlarmMailRequest_withExcelData_nullFileName() {
         // Given
-        List<Map<String, Object>> input = Arrays.asList(
-                createMap("orderId", 1, "notes", null)
+        Map<String, Object> queueData = createMap(
+                "SEVERITY", "WARNING",
+                "SECTION_TITLE", "지연 주문",
+                "SECTION_CONTENT", "확인 필요",
+                "MAIL_SOURCE", "OVERDUE"
+        );
+        List<Map<String, Object>> excelData = Arrays.asList(
+                createMap("orderId", "ORD001", "daysOverdue", 5)
+        );
+        List<Recipient> recipients = Arrays.asList(
+                Recipient.builder().email("admin@company.com").build()
         );
 
-        // When
-        List<Map<String, String>> result = service.convertToStringMap(input);
-
-        // Then
-        assertEquals("1", result.get(0).get("orderId"));
-        assertEquals("", result.get(0).get("notes"));  // NULL → 빈 문자열
-    }
-
-    @Test
-    public void convertToStringMap_nullInput() {
-        // When
-        List<Map<String, String>> result = service.convertToStringMap(null);
-
-        // Then
-        assertTrue(result.isEmpty());
-    }
-
-    @Test
-    public void convertToStringMap_emptyInput() {
-        // When
-        List<Map<String, String>> result = service.convertToStringMap(Collections.emptyList());
-
-        // Then
-        assertTrue(result.isEmpty());
-    }
-
-    @Test
-    public void convertToStringMap_preservesOrder() {
-        // Given - LinkedHashMap으로 순서 보장
-        Map<String, Object> row = new LinkedHashMap<>();
-        row.put("col1", "A");
-        row.put("col2", "B");
-        row.put("col3", "C");
-
-        List<Map<String, Object>> input = Arrays.asList(row);
-
-        // When
-        List<Map<String, String>> result = service.convertToStringMap(input);
-
-        // Then
-        assertEquals(1, result.size());
-        // LinkedHashMap으로 변환되므로 순서 유지
-        assertTrue(result.get(0) instanceof LinkedHashMap);
-
-        // 순서 확인 (keySet() 순회)
-        List<String> keys = new ArrayList<>(result.get(0).keySet());
-        assertEquals("col1", keys.get(0));
-        assertEquals("col2", keys.get(1));
-        assertEquals("col3", keys.get(2));
-    }
-
-    @Test
-    public void convertToStringMap_variousTypes() {
-        // Given - 다양한 타입 테스트
-        List<Map<String, Object>> input = Arrays.asList(
-                createMap(
-                        "intVal", 123,
-                        "longVal", 123L,
-                        "doubleVal", 123.45,
-                        "boolVal", true,
-                        "stringVal", "test"
-                )
+        // When (excelFileName NULL이면 sectionTitle 사용)
+        MailRequest result = service.buildAlarmMailRequest(
+                queueData, null, recipients, null,
+                excelData, null, null
         );
 
-        // When
-        List<Map<String, String>> result = service.convertToStringMap(input);
+        // Then
+        assertTrue(result.hasExcelAttachments());
+        assertEquals("지연 주문", result.getExcelAttachments().get(0).getTitle());
+    }
+
+    @Test
+    public void buildAlarmMailRequest_withoutExcelData() {
+        // Given
+        Map<String, Object> queueData = createMap(
+                "SEVERITY", "INFO",
+                "SECTION_TITLE", "정보",
+                "SECTION_CONTENT", "일반 메일",
+                "MAIL_SOURCE", "INFO"
+        );
+        List<Recipient> recipients = Arrays.asList(
+                Recipient.builder().email("user@company.com").build()
+        );
+
+        // When (excelData NULL)
+        MailRequest result = service.buildAlarmMailRequest(
+                queueData, null, recipients, null,
+                null, null, null
+        );
 
         // Then
-        assertEquals("123", result.get(0).get("intVal"));
-        assertEquals("123", result.get(0).get("longVal"));
-        assertEquals("123.45", result.get(0).get("doubleVal"));
-        assertEquals("true", result.get(0).get("boolVal"));
-        assertEquals("test", result.get(0).get("stringVal"));
+        assertFalse(result.hasExcelAttachments());
+    }
+
+    @Test
+    public void buildAlarmMailRequest_withEmptyExcelData() {
+        // Given
+        Map<String, Object> queueData = createMap(
+                "SEVERITY", "INFO",
+                "SECTION_TITLE", "정보",
+                "SECTION_CONTENT", "일반 메일",
+                "MAIL_SOURCE", "INFO"
+        );
+        List<Map<String, Object>> excelData = new ArrayList<>();
+        List<Recipient> recipients = Arrays.asList(
+                Recipient.builder().email("user@company.com").build()
+        );
+
+        // When (excelData empty)
+        MailRequest result = service.buildAlarmMailRequest(
+                queueData, null, recipients, null,
+                excelData, null, null
+        );
+
+        // Then
+        assertFalse(result.hasExcelAttachments());
     }
 
     // ===== Helper Methods =====
